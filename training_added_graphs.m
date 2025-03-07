@@ -1,16 +1,22 @@
 %% GPU Check
-if gpuDeviceCount > 0
-    g = gpuDevice(1);
-    fprintf('GPU detected: %s. Using GPU features.\n', g.Name);
-    useGPU = true;
-else
-    fprintf('No GPU detected. Running on CPU.\n');
-    useGPU = false;
-end
+% if gpuDeviceCount > 0
+%     g = gpuDevice(1);
+%     fprintf('GPU detected: %s. Using GPU features.\n', g.Name);
+%     useGPU = true;
+% else
+%     fprintf('No GPU detected. Running on CPU.\n');
+%     useGPU = false;
+% end
 
 useGPU = false;  
 
 data = load('converted_dataset.mat');
+test = load('converted_dataset_test.mat');
+
+test_edge_indices = test.edge_indices;
+test_features = test.features;
+test_labels = test.labels;
+
 edge_indices = data.edge_indices;
 features = data.features;          
 labels = data.labels;             
@@ -52,8 +58,8 @@ if useGPU
     blin = gpuArray(blin);
 end
 
-num_epochs   = 20;
-learning_rate = 0.001;
+num_epochs   = 10;
+learning_rate = 0.0005;
 dropout_prob  = 0.5;
 
 train_losses = zeros(num_epochs,1);
@@ -99,7 +105,7 @@ for epoch = 1:num_epochs
         features, edge_indices, labels, W1, b1, W2, b2, W3, b3, Wlin, blin, useGPU, 0.0);
     
     [test_loss_epoch, test_acc_epoch] = computeLossAccuracy( ...
-        features, edge_indices, labels, W1, b1, W2, b2, W3, b3, Wlin, blin, useGPU, 0.0);
+        test_features, test_edge_indices, test_labels, W1, b1, W2, b2, W3, b3, Wlin, blin, useGPU, 0.0);
     
     train_losses(epoch) = train_loss_epoch;
     test_losses(epoch)  = test_loss_epoch;
@@ -171,11 +177,13 @@ function [output, X1, X2, X3_drop, dropout_mask, A_norm, X3_pool] = forward( ...
     
     X1 = graphConv_withA_norm(X, A_norm, W1, b1);
     X1 = relu(X1);
-    
+    % [X1_drop, dropout_mask] = dropout(X1, dropout_prob);
+
     X2 = graphConv_withA_norm(X1, A_norm, W2, b2);
     X2 = relu(X2);
+    [X2_drop, dropout_mask] = dropout(X2, dropout_prob);
     
-    X3 = graphConv_withA_norm(X2, A_norm, W3, b3);
+    X3 = graphConv_withA_norm(X2_drop, A_norm, W3, b3);
     
     [X3_drop, dropout_mask] = dropout(X3, dropout_prob);
     
