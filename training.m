@@ -1,38 +1,53 @@
-%% Check for GPU availability
-if gpuDeviceCount > 0
-    g = gpuDevice(1);
-    fprintf('GPU detected: %s. Using GPU features.\n', g.Name);
-    useGPU = true;
-else
-    fprintf('No GPU detected. Running on CPU.\n');
-    useGPU = false;
-end
+% % %% Check for GPU availability
+%  if gpuDeviceCount > 0
+%      g = gpuDevice(1);
+%      fprintf('GPU detected: %s. Using GPU features.\n', g.Name);
+%      useGPU = true;
+%  else
+%      fprintf('No GPU detected. Running on CPU.\n');
+%      useGPU = false;
+%  end
 
-%% Load data (assumes data contains cell arrays: edge_indices, features, labels)
+useGPU = false;
+% %% Load data (assumes data contains cell arrays: edge_indices, features, labels)
 data = load('converted_dataset.mat');
 edge_indices = data.edge_indices;  % Each cell is an edge-index (adjacency) matrix
 features = data.features;          % Each cell is a feature matrix
 labels = data.labels;              % Each cell is a label
 
-% Optionally move data to GPU
-if useGPU
-    for i = 1:length(features)
-        features{i} = gpuArray(features{i});
-        edge_indices{i} = gpuArray(edge_indices{i});
-        labels{i} = gpuArray(labels{i});
-    end
-end
+% % Optionally move data to GPU
+%  if useGPU
+%      for i = 1:length(features)
+%          features{i} = gpuArray(features{i});
+%          edge_indices{i} = gpuArray(edge_indices{i});
+%          labels{i} = gpuArray(labels{i});
+%      end
+%  end
 
 first_features = features{1};
 
+function weights = initializeGlorot(sz,numOut,numIn)
+
+    Z = 2*rand(sz,'single') - 1;
+    bound = sqrt(6 / (numIn + numOut));
+    
+    weights = bound * Z;
+    weights = dlarray(weights);
+    
+    end
+
+
+
+
 %% Initialize weights and biases
 W1 = randn(size(first_features, 2), 64);
+W1 = initializeGlorot([size(first_features, 2), 64], 64, size(first_features, 2));
 b1 = zeros(1, 64);
-W2 = randn(64, 64);
+W2 =  initializeGlorot([64, 64], 64, 64);
 b2 = zeros(1, 64);
-W3 = randn(64, 64);
+W3 = initializeGlorot([64, 64], 64, 64);
 b3 = zeros(1, 64);
-Wlin = randn(64, 1);
+Wlin = initializeGlorot([64, 1], 1, 64);
 blin = 0;
 
 if useGPU
@@ -48,7 +63,7 @@ end
 
 %% Training parameters
 num_epochs = 10;
-learning_rate = 0.01;
+learning_rate = 0.001;
 dropout_prob = 0.5;
 
 %% Training Loop
@@ -103,8 +118,8 @@ for i = 1:total_samples
 end
 
 accuracy = num_correct / total_samples;
-if useGPU, accuracy = gather(accuracy); end
-fprintf('Test Accuracy: %.4f\n', accuracy);
+% if useGPU, accuracy = gather(accuracy); end
+% fprintf('Test Accuracy: %.4f\n', accuracy);
 
 %% Helper Functions
 
@@ -115,7 +130,7 @@ function A_norm = computeA_norm(A)
         A_norm = [];
     else
         eps_val = 1e-10;
-        D = diag( (sum(A, 2) + eps_val).^-0.5 );
+        D = diag( 1 ./ sqrt(max(sum(A, 2), eps_val)) );
         A_norm = D * A * D;
     end
 end
@@ -174,6 +189,10 @@ function [output, X1, X2, X3_drop, dropout_mask, A_norm, X3_pool] = forward(X, A
     % Linear layer followed by sigmoid activation
     linear_output = X3_pool * Wlin + blin;
     output = sigmoid(linear_output);
+
+    % if any(isnan(X1(:))) || any(isnan(X2(:))) || any(isnan(X3(:)))
+    %     error('NaN detected in forward pass');
+    % end
 end
 
 function loss = crossEntropyLoss(predictions, targets)
@@ -198,11 +217,19 @@ function loss = crossEntropyLoss(predictions, targets)
     end
 end
 
+% and replace "dOutput = double(output) - double(y);" with "dOutput = output - y;" in the backward function.
+
 function [dW1, db1, dW2, db2, dW3, db3, dWlin, dblin] = backward(X, A, y, W1, b1, W2, b2, W3, b3, Wlin, blin, X1, X2, X3_drop, dropout_mask, A_norm, X3_pool)
     % Backward pass for the network.
     linear_output = X3_pool * Wlin + blin;
-    output = 1 ./ (1 + exp(-linear_output));
-    dOutput = double(output) - double(y);  % scalar difference
+    % display(linear_output)
+    % For numerical stability
+    bounded = max(min(linear_output, 15), -15);
+    output = 1 ./ (1 + exp(-bounded));
+
+    % dOutput = output - y;
+    % output = 1 / (1 + exp(-linear_output));
+    dOutput = double(output - double(y));  % scalar difference
 
     % Gradients for linear layer
     dWlin = X3_pool' * dOutput;
@@ -246,6 +273,7 @@ function [dW1, db1, dW2, db2, dW3, db3, dWlin, dblin] = backward(X, A, y, W1, b1
     end
     db2 = sum(dX2, 1);
     
+
     if isempty(A_norm)
         dX1_from2 = dX2 * W2';
     else
@@ -254,6 +282,7 @@ function [dW1, db1, dW2, db2, dW3, db3, dWlin, dblin] = backward(X, A, y, W1, b1
 
     % Backprop through ReLU of Layer 1
     dX1 = dX1_from2 .* (X1 > 0);
+    
     
     % Backprop through Layer 1: X1 = A_norm * X * W1 + b1
     if isempty(A_norm)
