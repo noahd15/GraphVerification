@@ -1,4 +1,4 @@
-%% GPU Check
+% GPU Check
 if gpuDeviceCount > 0
     g = gpuDevice(1);
     fprintf('GPU detected: %s. Using GPU features.\n', g.Name);
@@ -8,9 +8,31 @@ else
     useGPU = false;
 end
 
-useGPU = false;  
+% useGPU = false;  
 
 data = load('converted_dataset.mat');
+
+% Split data into training and test set
+num_samples = length(data.edge_indices);
+rand_indices = randperm(num_samples);
+split_ratio = 0.7;
+num_train = round(split_ratio * num_samples);
+
+train_indices = rand_indices(1:num_train);
+test_indices = rand_indices(num_train+1:end);
+
+train.edge_indices = data.edge_indices(train_indices);
+train.features = data.features(train_indices);
+train.labels = data.labels(train_indices);
+
+test.edge_indices = data.edge_indices(test_indices);
+test.features = data.features(test_indices);
+test.labels = data.labels(test_indices);
+
+test_edge_indices = test.edge_indices;
+test_features = test.features;
+test_labels = test.labels;
+
 edge_indices = data.edge_indices;
 features = data.features;          
 labels = data.labels;             
@@ -32,14 +54,15 @@ function weights = initializeGlorot(sz, numOut, numIn)
     weights = dlarray(weights);
 end
 
-W1 = initializeGlorot([size(first_features, 2), 64], 64, size(first_features, 2));
-b1 = zeros(1, 64, 'single');
-W2 = initializeGlorot([64, 64], 64, 64);
-b2 = zeros(1, 64, 'single');
-W3 = initializeGlorot([64, 64], 64, 64);
-b3 = zeros(1, 64, 'single');
-Wlin = initializeGlorot([64, 1], 1, 64);  
+W1 = initializeGlorot([size(first_features, 2), 32], 32, size(first_features, 2));
+b1 = zeros(1, 32, 'single');
+W2 = initializeGlorot([32, 32], 32, 32);
+b2 = zeros(1, 32, 'single');
+W3 = initializeGlorot([32, 32], 32, 32);
+b3 = zeros(1, 32, 'single');
+Wlin = initializeGlorot([32, 1], 1, 32);  
 blin = 0;
+
 
 if useGPU
     W1   = gpuArray(W1);
@@ -52,9 +75,9 @@ if useGPU
     blin = gpuArray(blin);
 end
 
-num_epochs   = 20;
-learning_rate = 0.001;
-dropout_prob  = 0.5;
+num_epochs   = 50;
+learning_rate = 0.00002;
+dropout_prob  = 0.2;
 
 train_losses = zeros(num_epochs,1);
 test_losses  = zeros(num_epochs,1);
@@ -69,14 +92,14 @@ for epoch = 1:num_epochs
         A = edge_indices{i};
         y = labels{i}; 
         
-        [output, X1, X2, X3_drop, dropout_mask, A_norm, X3_pool] = ...
+        [output, X1, X2, X3_drop, mask1, mask2, mask3, A_norm, X3_pool] = ...
             forward(X, A, W1, b1, W2, b2, W3, b3, Wlin, blin, dropout_prob);
         
         loss = crossEntropyLoss(output, y);
         
         [dW1, db1, dW2, db2, dW3, db3, dWlin, dblin] = ...
             backward(X, A, y, W1, b1, W2, b2, W3, b3, Wlin, blin, ...
-                     X1, X2, X3_drop, dropout_mask, A_norm, X3_pool);
+                     X1, X2, X3_drop, mask1, mask2, mask3, A_norm, X3_pool);
         
         W1   = W1   - learning_rate * dW1;
         b1   = b1   - learning_rate * db1;
@@ -99,7 +122,7 @@ for epoch = 1:num_epochs
         features, edge_indices, labels, W1, b1, W2, b2, W3, b3, Wlin, blin, useGPU, 0.0);
     
     [test_loss_epoch, test_acc_epoch] = computeLossAccuracy( ...
-        features, edge_indices, labels, W1, b1, W2, b2, W3, b3, Wlin, blin, useGPU, 0.0);
+        test_features, test_edge_indices, test_labels, W1, b1, W2, b2, W3, b3, Wlin, blin, useGPU, 0.0);
     
     train_losses(epoch) = train_loss_epoch;
     test_losses(epoch)  = test_loss_epoch;
@@ -119,6 +142,7 @@ plot(1:num_epochs, test_losses, '-x', 'LineWidth', 1.5);
 xlabel('Epoch'); ylabel('Loss');
 title('Training and Testing Loss');
 legend('Train Loss','Test Loss','Location','best');
+saveas(gcf, 'training_testing_loss.png');
 grid on;
 
 figure;
@@ -127,6 +151,7 @@ plot(1:num_epochs, test_accs, '-x', 'LineWidth', 1.5);
 xlabel('Epoch'); ylabel('Accuracy');
 title('Training and Testing Accuracy');
 legend('Train Accuracy','Test Accuracy','Location','best');
+saveas(gcf, 'training_testing_accuracy.png');
 grid on;
 
 function A_norm = computeA_norm(A)
@@ -164,24 +189,28 @@ function dX = dropoutGrad(dY, mask)
     dX = dY .* mask;
 end
 
-function [output, X1, X2, X3_drop, dropout_mask, A_norm, X3_pool] = forward( ...
+function [output, X1, X2, X3_drop, mask1, mask2, mask3, A_norm, X3_pool] = forward( ...
     X, A, W1, b1, W2, b2, W3, b3, Wlin, blin, dropout_prob)
 
     A_norm = computeA_norm(A);
-    
-    X1 = graphConv_withA_norm(X, A_norm, W1, b1);
-    X1 = relu(X1);
-    
-    X2 = graphConv_withA_norm(X1, A_norm, W2, b2);
-    X2 = relu(X2);
-    
-    X3 = graphConv_withA_norm(X2, A_norm, W3, b3);
-    
-    [X3_drop, dropout_mask] = dropout(X3, dropout_prob);
-    
+
+    % First graph convolution + ReLU + dropout
+    X1 = relu(graphConv_withA_norm(X, A_norm, W1, b1));
+    [X1_drop, mask1] = dropout(X1, dropout_prob);
+
+    % Second graph convolution + ReLU + dropout
+    X2 = relu(graphConv_withA_norm(X1_drop, A_norm, W2, b2));
+    [X2_drop, mask2] = dropout(X2, dropout_prob);
+
+    % Third graph convolution + dropout
+    X3 = graphConv_withA_norm(X2_drop, A_norm, W3, b3);
+    [X3_drop, mask3] = dropout(X3, 0.2);
+
+    % Pooling + final linear
     X3_pool = mean(X3_drop, 1);
     linear_output = X3_pool * Wlin + blin;
-    output = sigmoid(linear_output);
+    output = linear_output;  % or apply sigmoid if desired
+ %   output = sigmoid(linear_output);
 end
 
 function loss = crossEntropyLoss(predictions, targets)
@@ -203,67 +232,58 @@ end
 
 function [dW1, db1, dW2, db2, dW3, db3, dWlin, dblin] = backward( ...
     X, A, y, W1, b1, W2, b2, W3, b3, Wlin, blin, ...
-    X1, X2, X3_drop, dropout_mask, A_norm, X3_pool)
+    X1, X2, X3_drop, mask1, mask2, mask3, A_norm, X3_pool)
 
-    linear_output = X3_pool * Wlin + blin;
-    bounded       = max(min(linear_output, 15), -15);
-    output        = 1 ./ (1 + exp(-bounded));
-    
-    if ~isa(output, 'double')
-        output = double(gather(output));
-    end
-    if ~isa(y, 'double')
-        y = double(gather(y));
-    end
-    
-    dOutput = output - y;  
-    
-    dWlin = X3_pool' * dOutput;
-    dblin = dOutput;
-    
-    n = size(X3_drop, 1);
+    % Forward’s final output
+    bounded = max(min(X3_pool * Wlin + blin, 15), -15);
+    output  = 1 ./ (1 + exp(-bounded));
+
+    dOutput = output - double(y);
+    dWlin   = X3_pool' * dOutput;
+    dblin   = dOutput;
+
+    % Backprop through pooling
+    n        = size(X3_drop, 1);
     dX3_pool = repmat(dOutput * Wlin', n, 1) / n;
-    
-    dX3 = dropoutGrad(dX3_pool, dropout_mask);
-    
+
+    % Backprop through dropout on X3
+    dX3 = dropoutGrad(dX3_pool, mask3);
+
+    % GraphConv W3, using X2_drop in forward
     if isempty(A_norm)
-        dX3_temp = dX3 * W3';
+        dW3    = (X2 .* mask2)' * dX3;
+        dX2tmp = dX3 * W3';
     else
-        dX3_temp = A_norm' * dX3 * W3';
-    end
-    
-    if isempty(A_norm)
-        dW3 = X2' * dX3;
-    else
-        dW3 = X2' * (A_norm' * dX3);
+        dW3    = (A_norm * (X2 .* mask2))' * dX3;
+        dX2tmp = (A_norm' * dX3) * W3';
     end
     db3 = sum(dX3, 1);
-    
-    dX2_from3 = dX3_temp;
-    dX2 = dX2_from3 .* (X2 > 0);
-    
+
+    % Backprop through ReLU + dropout (layer 2)
+    dX2tmp = dX2tmp .* (X2 > 0);
+    dX2    = dropoutGrad(dX2tmp, mask2);
+
     if isempty(A_norm)
-        dW2 = X1' * dX2;
+        dW2    = (X1 .* mask1)' * dX2;
+        dX1tmp = dX2 * W2';
     else
-        dW2 = X1' * (A_norm' * dX2);
+        dW2    = (A_norm * (X1 .* mask1))' * dX2;
+        dX1tmp = (A_norm' * dX2) * W2';
     end
     db2 = sum(dX2, 1);
-    
-    if isempty(A_norm)
-        dX1_from2 = dX2 * W2';
-    else
-        dX1_from2 = A_norm * (dX2 * W2');
-    end
-    
-    dX1 = dX1_from2 .* (X1 > 0);
-    
+
+    % Backprop through ReLU + dropout (layer 1)
+    dX1tmp = dX1tmp .* (X1 > 0);
+    dX1    = dropoutGrad(dX1tmp, mask1);
+
     if isempty(A_norm)
         dW1 = X' * dX1;
     else
-        dW1 = X' * (A_norm' * dX1);
+        dW1 = (A_norm * X)' * dX1;
     end
     db1 = sum(dX1, 1);
 end
+
 function [avg_loss, accuracy] = computeLossAccuracy( ...
     features, edge_indices, labels, ...
     W1, b1, W2, b2, W3, b3, Wlin, blin, ...
