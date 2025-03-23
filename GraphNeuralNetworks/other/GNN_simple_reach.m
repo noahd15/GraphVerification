@@ -13,6 +13,8 @@
 % Time to start, make a prototype, and then we can try to generalize
 
 %% Load GNN and input (using GNN_simple_example.m)
+run('GraphNeuralNetworks/other/GNN_simple_example.m')
+
 addpath(genpath('/Users/Noah/nnv'))
 % Adjacency matrix (How the nodes are connected)
 A = [0 1 1 1 0 0;
@@ -56,7 +58,7 @@ R1 = L.reach(IS,'exact-star');
 Rt = R1.affineMap(DAD,[]);
 IS.V = transpose(IS.V);
 size(W1)
-Rt = Rt.affineMap(transpose(W1),[]);
+Rt = Rt.affineMap(W1,[]);
 R = L.reach(Rt,'exact-star');
 
 
