@@ -8,7 +8,7 @@ else
     useGPU = false;
 end
 
-% useGPU = false;  
+useGPU = false;  
 
 data = load('converted_dataset.mat');
 
@@ -54,14 +54,16 @@ function weights = initializeGlorot(sz, numOut, numIn)
     weights = dlarray(weights);
 end
 
-W1 = initializeGlorot([size(first_features, 2), 32], 32, size(first_features, 2));
-b1 = zeros(1, 32, 'single');
-W2 = initializeGlorot([32, 32], 32, 32);
-b2 = zeros(1, 32, 'single');
-W3 = initializeGlorot([32, 32], 32, 32);
-b3 = zeros(1, 32, 'single');
-Wlin = initializeGlorot([32, 1], 1, 32);  
+hidden_size = 32;
+W1 = initializeGlorot([size(first_features,2), hidden_size], hidden_size, size(first_features,2));
+b1 = zeros(1, hidden_size, 'single');
+W2 = initializeGlorot([hidden_size, hidden_size], hidden_size, hidden_size);
+b2 = zeros(1, hidden_size, 'single');
+W3 = initializeGlorot([hidden_size, hidden_size], hidden_size, hidden_size);
+b3 = zeros(1, hidden_size, 'single');
+Wlin = initializeGlorot([hidden_size, 1], 1, hidden_size);
 blin = 0;
+
 
 
 if useGPU
@@ -75,7 +77,7 @@ if useGPU
     blin = gpuArray(blin);
 end
 
-num_epochs   = 50;
+num_epochs   = 1;
 learning_rate = 0.00002;
 dropout_prob  = 0.2;
 
@@ -136,6 +138,20 @@ for epoch = 1:num_epochs
     fprintf('  Test  Loss                : %.4f | Test  Acc : %.4f\n', ...
         test_loss_epoch, test_acc_epoch);
 end
+
+% Save the trained model parameters
+model.W1 = W1;
+model.b1 = b1;
+model.W2 = W2;
+model.b2 = b2;
+model.W3 = W3;
+model.b3 = b3;
+model.Wlin = Wlin;
+model.blin = blin;
+
+save('trained_model.mat', 'model');
+fprintf('Model saved to trained_model.mat\n');
+
 figure;
 plot(1:num_epochs, train_losses, '-o', 'LineWidth', 1.5); hold on;
 plot(1:num_epochs, test_losses, '-x', 'LineWidth', 1.5);
