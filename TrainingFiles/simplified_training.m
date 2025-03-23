@@ -8,6 +8,7 @@ if useGPU
 else
     fprintf('No GPU detected: Running on CPU.\n');
 end
+useGPU = false;
 
 % Load & Split Data
 data = load('converted_dataset.mat');

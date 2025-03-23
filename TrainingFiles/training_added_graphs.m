@@ -77,7 +77,7 @@ if useGPU
     blin = gpuArray(blin);
 end
 
-num_epochs   = 1;
+num_epochs   = 10;
 learning_rate = 0.00002;
 dropout_prob  = 0.2;
 

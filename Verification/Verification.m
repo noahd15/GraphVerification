@@ -18,32 +18,33 @@ useGPU = false;  % Force CPU for consistent verification
 fprintf('Loading model and test data...\n');
 model_path = fullfile('./', 'TrainingFiles', 'trained_model.mat');
 data_path = fullfile('./', 'TrainingFiles', 'converted_dataset.mat');
-run('TrainingFiles/training_added_graphs.m');  % Load the dataset
-% model = load(model_path);
+% run('TrainingFiles/training_added_graphs.m');  % Load the dataset
+
+model = load(model_path);
 data = load(data_path);
 
 % Get model parameters
-% W1 = model.model.W1;
-% b1 = model.model.b1;
-% W2 = model.model.W2;
-% b2 = model.model.b2;
-% W3 = model.model.W3;
-% b3 = model.model.b3;
-% Wlin = model.model.Wlin;
-% blin = model.model.blin;
+W1 = model.model.W1;
+b1 = model.model.b1;
+W2 = model.model.W2;
+b2 = model.model.b2;
+W3 = model.model.W3;
+b3 = model.model.b3;
+Wlin = model.model.Wlin;
+blin = model.model.blin;
 
-W1 = model.W1;
-b1 = model.b1;
-W2 = model.W2;
-b2 = model.b2;
-W3 = model.W3;
-b3 = model.b3;
-Wlin = model.Wlin;
-blin = model.blin;
+% W1 = model.W1;
+% b1 = model.b1;
+% W2 = model.W2;
+% b2 = model.b2;
+% W3 = model.W3;
+% b3 = model.b3;
+% Wlin = model.Wlin;
+% blin = model.blin;
 
 % Split data into training and test set (using same split logic as training)
 num_samples = length(data.edge_indices);
-rng(42);  % Set seed for reproducibility
+rng(988);  % Set seed for reproducibility
 rand_indices = randperm(num_samples);
 split_ratio = 0.7;
 num_train = round(split_ratio * num_samples);
