@@ -10,7 +10,7 @@ end
 
 useGPU = false;  
 
-data = load('converted_dataset.mat');
+data = load('data/dataset_matlab.mat');
 
 % Split data into training and test set
 num_samples = length(data.edge_indices);
@@ -149,7 +149,7 @@ model.b3 = b3;
 model.Wlin = Wlin;
 model.blin = blin;
 
-save('trained_model.mat', 'model');
+save('logs/trained_models/trained_model.mat', 'model');
 fprintf('Model saved to trained_model.mat\n');
 
 figure;
@@ -158,7 +158,7 @@ plot(1:num_epochs, test_losses, '-x', 'LineWidth', 1.5);
 xlabel('Epoch'); ylabel('Loss');
 title('Training and Testing Loss');
 legend('Train Loss','Test Loss','Location','best');
-saveas(gcf, 'training_testing_loss.png');
+saveas(gcf, 'logs/results/training_testing_loss.png');
 grid on;
 
 figure;
@@ -167,7 +167,7 @@ plot(1:num_epochs, test_accs, '-x', 'LineWidth', 1.5);
 xlabel('Epoch'); ylabel('Accuracy');
 title('Training and Testing Accuracy');
 legend('Train Accuracy','Test Accuracy','Location','best');
-saveas(gcf, 'training_testing_accuracy.png');
+saveas(gcf, 'logs/results/training_testing_accuracy.png');
 grid on;
 
 function A_norm = computeA_norm(A)
