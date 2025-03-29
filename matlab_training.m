@@ -149,6 +149,18 @@ model.b3 = b3;
 model.Wlin = Wlin;
 model.blin = blin;
 
+if ~exist('logs', 'dir')
+    mkdir('logs');
+end
+
+if ~exist('logs/trained_models', 'dir')
+    mkdir('logs/trained_models');
+end
+
+if ~exist('logs/results', 'dir')
+    mkdir('logs/results');
+end
+
 save('logs/trained_models/trained_model.mat', 'model');
 fprintf('Model saved to trained_model.mat\n');
 
