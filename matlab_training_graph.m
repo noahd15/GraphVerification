@@ -161,7 +161,7 @@ if ~exist('logs/results', 'dir')
     mkdir('logs/results');
 end
 
-save('logs/trained_models/trained_model.mat', 'model');
+save('logs/trained_models/trained_graph_model.mat', 'model');
 fprintf('Model saved to trained_model.mat\n');
 
 figure;
@@ -170,7 +170,7 @@ plot(1:num_epochs, test_losses, '-x', 'LineWidth', 1.5);
 xlabel('Epoch'); ylabel('Loss');
 title('Training and Testing Loss');
 legend('Train Loss','Test Loss','Location','best');
-saveas(gcf, 'logs/results/training_testing_loss.png');
+saveas(gcf, 'logs/results/training_testing_graph_loss.png');
 grid on;
 
 figure;
@@ -179,7 +179,7 @@ plot(1:num_epochs, test_accs, '-x', 'LineWidth', 1.5);
 xlabel('Epoch'); ylabel('Accuracy');
 title('Training and Testing Accuracy');
 legend('Train Accuracy','Test Accuracy','Location','best');
-saveas(gcf, 'logs/results/training_testing_accuracy.png');
+saveas(gcf, 'logs/results/training_testing_graph_accuracy.png');
 grid on;
 
 function A_norm = computeA_norm(A)
