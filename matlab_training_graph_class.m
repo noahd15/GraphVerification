@@ -10,7 +10,7 @@ end
 
 useGPU = false;  
 
-data = load('data/dataset_matlab.mat');
+data = load('data/dataset_matlab_graph.mat');
 
 % Split data into training and test set
 num_samples = length(data.edge_indices);
