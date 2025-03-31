@@ -40,7 +40,7 @@
 
 
 %% Download data and preprocess it
-
+addpath(genpath("GraphNeuralNetworks/nodeClassification/functions"))
 dataURL = "http://quantum-machine.org/data/qm7.mat";
 outputFolder = fullfile(tempdir,"qm7Data");
 dataFile = fullfile(outputFolder,"qm7.mat");

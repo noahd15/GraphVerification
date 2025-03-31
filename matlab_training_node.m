@@ -21,6 +21,11 @@ for i = 1:length(data.labels)
     end
 end
 
+for i = 1:length(data)
+    disp(data);
+    break;
+end
+
 % (Optional) You can also inspect one sample:
 % disp('Size of first label: ');
 % disp(size(data.labels{1}));
@@ -141,6 +146,23 @@ test_losses  = zeros(num_epochs,1);
 train_accs   = zeros(num_epochs,1);
 test_accs    = zeros(num_epochs,1);
 
+% Create figures for real-time plotting
+figure(1);
+loss_plot = plot(NaN, NaN, '-o', 'LineWidth', 1.5); hold on;
+test_loss_plot = plot(NaN, NaN, '-x', 'LineWidth', 1.5);
+xlabel('Epoch'); ylabel('Loss');
+title('Training and Testing Loss');
+legend('Train Loss','Test Loss','Location','best');
+grid on;
+
+figure(2);
+acc_plot = plot(NaN, NaN, '-o', 'LineWidth', 1.5); hold on;
+test_acc_plot = plot(NaN, NaN, '-x', 'LineWidth', 1.5);
+xlabel('Epoch'); ylabel('Accuracy');
+title('Training and Testing Accuracy');
+legend('Train Accuracy','Test Accuracy','Location','best');
+grid on;
+
 %% Main Training Loop
 for epoch = 1:num_epochs
     epoch_loss = 0;
@@ -197,6 +219,19 @@ for epoch = 1:num_epochs
     fprintf('  Training Loss (this loop): %.4f\n', epoch_loss); 
     fprintf('  Train Loss (eval): %.4f | Train Acc: %.4f\n', train_loss_epoch, train_acc_epoch);
     fprintf('  Test  Loss: %.4f | Test Acc: %.4f\n', test_loss_epoch, test_acc_epoch);
+    
+    % Update plots in real-time
+    figure(1);
+    set(loss_plot, 'XData', 1:epoch, 'YData', train_losses(1:epoch));
+    set(test_loss_plot, 'XData', 1:epoch, 'YData', test_losses(1:epoch));
+    xlim([1, max(2, epoch)]);
+    drawnow;
+    
+    figure(2);
+    set(acc_plot, 'XData', 1:epoch, 'YData', train_accs(1:epoch));
+    set(test_acc_plot, 'XData', 1:epoch, 'YData', test_accs(1:epoch));
+    xlim([1, max(2, epoch)]);
+    drawnow;
 end
 
 %% Save Model Parameters
@@ -204,6 +239,18 @@ model.W1   = W1;   model.b1   = b1;
 model.W2   = W2;   model.b2   = b2;
 model.W3   = W3;   model.b3   = b3;
 model.Wlin = Wlin; model.blin = blin;
+
+parameters.mult1.Weights = gather(W1);
+parameters.mult2.Weights = gather(W2);
+parameters.mult3.Weights = gather(W3);
+
+if ~exist('models','dir')
+    mkdir('models');
+end
+
+modelPath = "trained_node_model"; % or set it dynamically
+save("models/" + modelPath + ".mat", "parameters");
+fprintf('Model saved to %s\n', "models/" + modelPath + ".mat");
 
 if ~exist('logs', 'dir'), mkdir('logs'); end
 if ~exist('logs/trained_models', 'dir'), mkdir('logs/trained_models'); end

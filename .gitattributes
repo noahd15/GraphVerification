@@ -6,3 +6,5 @@ data/dataset_python.pt filter=lfs diff=lfs merge=lfs -text
 data/dataset_matlab_node.mat filter=lfs diff=lfs merge=lfs -text
 data/dataset_python_node.pt filter=lfs diff=lfs merge=lfs -text
 data/dataset_matlab_graph.mat filter=lfs diff=lfs merge=lfs -text
+*.mat filter=lfs diff=lfs merge=lfs -text
+data/*.mat filter=lfs diff=lfs merge=lfs -text

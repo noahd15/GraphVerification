@@ -6,7 +6,8 @@
 
 
 %% Load data
-
+addpath(genpath('/Users/noah/nnv'))
+addpath(genpath('C:\Users\Noah\OneDrive - Vanderbilt\Spring 2025\CS 6315\Project\AV_Project\GraphNeuralNetworks/nodeClassification/functions'))
 rng(0); % ensure we can reproduce (data partition)
 
 dataURL = "http://quantum-machine.org/data/qm7.mat";

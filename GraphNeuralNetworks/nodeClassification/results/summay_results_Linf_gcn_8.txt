@@ -1,4 +1,4 @@
-Summary of robustness results of gnn model with accuracy = 0.9043 
+Summary of robustness results of gnn model with accuracy = 0.9046 
 
                MOLECULES 
 Epsilon | Robust  Unknown  Not Rob.  N 
@@ -12,5 +12,5 @@ Epsilon | Robust  Unknown  Not Rob.  N
 Epsilon | Robust  Unknown  Not Rob.  N 
   0.005 | 0.842    0.053   0.105   13623 
    0.01 | 0.842    0.105   0.053   13623 
-   0.02 | 0.684    0.263   0.053   13623 
+   0.02 | 0.842    0.105   0.053   13623 
    0.05 | 0.421    0.526   0.053   13623 
