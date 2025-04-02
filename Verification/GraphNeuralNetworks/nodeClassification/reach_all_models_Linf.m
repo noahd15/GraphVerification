@@ -76,11 +76,13 @@ seeds = [5,6,7,8,9]; % models
 epsilon = [0.005, 0.01, 0.02, 0.05]; % attack
 
 % Verify one model at a time
-parfor k=1:length(seeds)
+% parfor k=1:length(seeds)
     % get model
-    modelPath = "gcn_"+string(seeds(k));
+    % modelPath = "gcn_"+string(seeds(k));
+modelPath = "trained_node_model";
 
-    % Verify model
-    reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest);
-end
+% Verify model
+reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest);
+
+% end
 

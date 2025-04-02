@@ -158,6 +158,7 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     newV = tensorprod(newV, extractdata(weights{1}));
     newV = permute(newV, [1 4 3 2]);
     X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
+    
     % part 2
     X2b = L.reach(X2, reachMethod);
     repV = repmat(Xverify.V,[1,32,1,1]);

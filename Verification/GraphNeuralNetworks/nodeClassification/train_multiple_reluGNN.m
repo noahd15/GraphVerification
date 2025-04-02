@@ -3,81 +3,60 @@
 
 %% Download data and preprocess it
 
-dataURL = "http://quantum-machine.org/data/qm7.mat";
-outputFolder = fullfile(tempdir,"qm7Data");
-dataFile = fullfile(outputFolder,"qm7.mat");
 
-if ~exist(dataFile,"file")
-    mkdir(outputFolder);
-    disp("Downloading QM7 data...");
-    websave(dataFile, dataURL);
-    disp("Done.")
-end
+dataFile = "C:/Users/Noah/OneDrive - Vanderbilt/Spring 2025/CS 6315/Project/AV_Project/Data/node.mat";
 
-rng(2024); % set fix random seed for data
+
 
 data = load(dataFile);
-% Extract the Coulomb data and the atomic numbers from the loaded structure. 
-% Permute the Coulomb data so that the third dimension corresponds to the observations. 
-coulombData = double(permute(data.X, [2 3 1]));
-% Sort the atomic numbers in descending order.
-atomData = sort(data.Z,2,'descend');
+disp(data);
+% Extract the feature data and the label numbers from the loaded structure. 
+% Permute the feature data so that the third dimension corresponds to the observations. 
+featureData = data.features;
+labelData = data.labels;
+
+
+% Sort the label numbers in descending order.
+
 % convert data to adjacency form
-adjacencyData = coulomb2Adjacency(coulombData,atomData);
+adjacencyData = edges2Adjacency(data);
 
-% Visualize data
-figure
-tiledlayout("flow")
-
-for i = 1:9
-    % Extract unpadded adjacency matrix.
-    atomicNumbers = nonzeros(atomData(i,:));
-    numNodes = numel(atomicNumbers);
-    A = adjacencyData(1:numNodes,1:numNodes,i);
-
-    % Convert adjacency matrix to graph.
-    G = graph(A);
-
-    % Convert atomic numbers to symbols.
-    symbols = atomicSymbol(atomicNumbers);
-
-    % Plot graph.
-    nexttile
-    plot(G,NodeLabel=symbols,Layout="force")
-    title("Molecule " + i)
-end
-
-figure
-histogram(categorical(atomicSymbol(atomData)))
-xlabel("Node Label")
-ylabel("Frequency")
-title("Label Counts")
+% Check adjacencyData dimensions
+disp("Size of adjacencyData: " + mat2str(size(adjacencyData)));
 
 % Partition data
-numObservations = size(adjacencyData,3);
+numObservations = size(adjacencyData, 2);
 [idxTrain,idxValidation,idxTest] = trainingPartitions(numObservations,[0.8 0.1 0.1]);
 
-adjacencyDataTrain = adjacencyData(:,:,idxTrain);
-adjacencyDataValidation = adjacencyData(:,:,idxValidation);
-adjacencyDataTest = adjacencyData(:,:,idxTest);
+% Partition adjacency data - CELL ARRAYS ARE 1xN, so index along second dimension
+adjacencyDataTrain = adjacencyData(1,idxTrain);
+adjacencyDataValidation = adjacencyData(1,idxValidation);
+adjacencyDataTest = adjacencyData(1,idxTest);
 
-coulombDataTrain = coulombData(:,:,idxTrain);
-coulombDataValidation = coulombData(:,:,idxValidation);
-coulombDataTest = coulombData(:,:,idxTest);
+% Do the same for feature data - also a 1xN cell array
+featureDataTrain = featureData(1,idxTrain);
+featureDataValidation = featureData(1,idxValidation);
+featureDataTest = featureData(1,idxTest);
 
-atomDataTrain = atomData(idxTrain,:);
-atomDataValidation = atomData(idxValidation,:);
-atomDataTest = atomData(idxTest,:);
+% And for label data - also a 1xN cell array
+labelDataTrain = labelData(1,idxTrain);
+labelDataValidation = labelData(1,idxValidation);
+labelDataTest = labelData(1,idxTest);
+
 
 % convert data for training
-[ATrain,XTrain,labelsTrain] = preprocessData(adjacencyDataTrain,coulombDataTrain,atomDataTrain);
-[AValidation,XValidation,labelsValidation] = preprocessData(adjacencyDataValidation,coulombDataValidation,atomDataValidation);
+[ATrain,XTrain,labelsTrain] = preprocessData(adjacencyDataTrain,featureDataTrain,labelDataTrain);
+[AValidation,XValidation,labelsValidation] = preprocessData(adjacencyDataValidation,featureDataValidation,labelDataValidation);
 
 % normalize training data
 muX = mean(XTrain);
 sigsqX = var(XTrain,1);
 
-XTrain = (XTrain - muX)./sqrt(sigsqX);
+if isempty(XTrain)
+    error("Feature matrix XTrain is empty.");
+end
+
+XTrain = (XTrain - muX) ./ sqrt(sigsqX);
 XValidation = (XValidation - muX)./sqrt(sigsqX);
 
 
@@ -113,6 +92,7 @@ for i=1:length(seeds)
     % Layer 3
     classes = categories(labelsTrain);
     numClasses = numel(classes);
+
     
     sz = [numHiddenFeatureMaps numClasses];
     numOut = numClasses;
@@ -135,14 +115,15 @@ for i=1:length(seeds)
     XTrain = dlarray(XTrain);
     XValidation = dlarray(XValidation);
     
+    canUseGPU = false;
     % gpu?
     if canUseGPU
         XTrain = gpuArray(XTrain);
     end
     
-    % convert labels to onehot vector encoding
-    TTrain = onehotencode(labelsTrain,2,ClassNames=classes);
-    TValidation = onehotencode(labelsValidation,2,ClassNames=classes);    
+    % Convert labels to onehot vector encoding
+    TTrain = onehotencode(labelsTrain, 1, ClassNames=classes);
+    TValidation = onehotencode(labelsValidation, 1, ClassNames=classes);    
     
     epoch = 0; %initialize epoch
     best_val = 0;
@@ -189,7 +170,7 @@ for i=1:length(seeds)
     
     %% Testing
     
-    [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest,coulombDataTest,atomDataTest);
+    [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest,featureDataTest,labelDataTest);
     XTest = (XTest - muX)./sqrt(sigsqX);
     XTest = dlarray(XTest);
     
@@ -216,66 +197,72 @@ end
 %% Helper functions %%
 %%%%%%%%%%%%%%%%%%%%%%
 
-function [adjacency,features,labels] = preprocessData(adjacencyData,coulombData,atomData)
+function [adjacency,features,labels] = preprocessData(adjacencyData,featureData, labelData)
+    [adjacency, features] = preprocessPredictors(adjacencyData,featureData);
 
-    [adjacency, features] = preprocessPredictors(adjacencyData,coulombData);
     labels = [];
     
     % Convert labels to categorical.
-    for i = 1:size(adjacencyData,3)
-        % Extract and append unpadded data.
-        T = nonzeros(atomData(i,:));
+    for i = 1:size(adjacencyData,2)
+        % Extract the cell content first using curly braces, then get nonzeros
+        labelContent = labelData{1,i};
+        
+        % Check if the content is a cell itself (nested cell array)
+        if iscell(labelContent)
+            if ~isempty(labelContent)
+                labelContent = labelContent{1}; % Extract from nested cell
+            else
+                continue; % Skip empty cells
+            end
+        end
+        
+        % Now extract non-zero values if it's numeric
+        if isnumeric(labelContent)
+            T = nonzeros(labelContent);
+        else
+            % If it's not numeric, convert or handle appropriately
+            T = labelContent;
+        end
+
         labels = [labels; T];
     end
     
-    labels2 = nonzeros(atomData);
-    assert(isequal(labels2,labels2))
-    
-    atomicNumbers = unique(labels);
-    atomNames =  atomicSymbol(atomicNumbers);
-    labels = categorical(labels, atomicNumbers, atomNames);
-
+    labelNumbers = unique(labels);
+    labelNames = labelSymbol(labelNumbers);
+    labels = categorical(labels, labelNumbers, labelNames);
 end
 
-function [adjacency,features] = preprocessPredictors(adjacencyData,coulombData)
-
+function [adjacency,features] = preprocessPredictors(adjacencyData,featureData)
     adjacency = sparse([]);
     features = [];
-    
-    for i = 1:size(adjacencyData, 3)
-        % Extract unpadded data.
-        numNodes = find(any(adjacencyData(:,:,i)),1,"last");
-    
-        A = adjacencyData(1:numNodes,1:numNodes,i);
-        X = coulombData(1:numNodes,1:numNodes,i);
-    
-        % Extract feature vector from diagonal of Coulomb matrix.
-        X = diag(X);
-    
-        % Append extracted data.
-        adjacency = blkdiag(adjacency,A);
+
+    for i = 1:size(adjacencyData, 2)
+        % Extract the content from the cell arrays using curly braces
+        A = adjacencyData{1,i}; 
+        X = featureData{1,i};
+        
+        % Ensure A is in sparse format
+        if ~issparse(A)
+            A = sparse(A);
+        end
+        
+        % Append extracted data
+        adjacency = blkdiag(adjacency, A);
         features = [features; X];
     end
-
 end
 
-function Y = model(parameters,X,A)
-
-    ANorm = normalizeAdjacency(A);
+function Y = model(parameters, X, A)
+    % Normalize adjacency matrix
+    A_norm = normalizeAdjacency(A);
     
-    Z1 = X;
+    % Forward pass
+    X1 = relu(A_norm * X * parameters.mult1.Weights);
+    X2 = relu(A_norm * X1 * parameters.mult2.Weights);
+    X3 = A_norm * X2 * parameters.mult3.Weights;
     
-    Z2 = ANorm * Z1 * parameters.mult1.Weights;
-    Z2 = relu(Z2) + Z1;
-    % Z2 = relu(Z2);
-    
-    Z3 = ANorm * Z2 * parameters.mult2.Weights;
-    Z3 = relu(Z3) + Z2;
-    % Z3 = relu(Z3);
-    
-    Z4 = ANorm * Z3 * parameters.mult3.Weights;
-    Y = softmax(Z4,DataFormat="BC");
-
+    % Use softmax with the correct syntax
+    Y = softmax(X3, 'DataFormat', 'BC');
 end
 
 function [loss,gradients] = modelLoss(parameters,X,A,T)
@@ -287,16 +274,20 @@ function [loss,gradients] = modelLoss(parameters,X,A,T)
 end
 
 function ANorm = normalizeAdjacency(A)
-
-    % Add self connections to adjacency matrix.
+    if isempty(A)
+        ANorm = sparse([]);
+        return;
+    end
+    
+    % Add self-connections to adjacency matrix.
     A = A + speye(size(A));
     
     % Compute inverse square root of degree.
     degree = sum(A, 2);
-    degreeInvSqrt = sparse(sqrt(1./degree));
+    degreeInvSqrt = sparse(sqrt(1 ./ degree));
+    degreeInvSqrt(isinf(degreeInvSqrt)) = 0; % Handle divide-by-zero cases
     
     % Normalize adjacency matrix.
     ANorm = diag(degreeInvSqrt) * A * diag(degreeInvSqrt);
-
 end
 
