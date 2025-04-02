@@ -1,24 +1,37 @@
 %% Train multiple models to evaluate and certify accuracy and certified accuracy
 % For now, do 5 different random seeds and save the model to analyze later
 
+%% GPU Setup Check
+if gpuDeviceCount > 0
+    g = gpuDevice(1);
+    fprintf('GPU detected: %s. Using GPU features.\n', g.Name);
+    canUseGPU = true;
+else
+    fprintf('No GPU detected. Running on CPU.\n');
+    canUseGPU = false;
+end
+
+% For debugging/verification purposes, force CPU usage
+canUseGPU = false;
+
 %% Download data and preprocess it
-
-
 dataFile = "C:/Users/Noah/OneDrive - Vanderbilt/Spring 2025/CS 6315/Project/AV_Project/Data/node.mat";
-
-
 
 data = load(dataFile);
 disp(data);
-% Extract the feature data and the label numbers from the loaded structure. 
-% Permute the feature data so that the third dimension corresponds to the observations. 
+
+% Extract the feature data and the label data
 featureData = data.features;
 labelData = data.labels;
 
+% Ensure every label cell is a column vector
+for i = 1:length(labelData)
+    if isrow(labelData{i})
+        labelData{i} = labelData{i}';
+    end
+end
 
-% Sort the label numbers in descending order.
-
-% convert data to adjacency form
+% Convert data to adjacency form
 adjacencyData = edges2Adjacency(data);
 
 % Check adjacencyData dimensions
@@ -43,12 +56,11 @@ labelDataTrain = labelData(1,idxTrain);
 labelDataValidation = labelData(1,idxValidation);
 labelDataTest = labelData(1,idxTest);
 
-
-% convert data for training
+% Convert data for training
 [ATrain,XTrain,labelsTrain] = preprocessData(adjacencyDataTrain,featureDataTrain,labelDataTrain);
 [AValidation,XValidation,labelsValidation] = preprocessData(adjacencyDataValidation,featureDataValidation,labelDataValidation);
 
-% normalize training data
+% Normalize training data
 muX = mean(XTrain);
 sigsqX = var(XTrain,1);
 
@@ -59,14 +71,40 @@ end
 XTrain = (XTrain - muX) ./ sqrt(sigsqX);
 XValidation = (XValidation - muX)./sqrt(sigsqX);
 
+%% Calculate Class Counts from Training Labels (for class weights)
+classes = categories(labelsTrain);
+numClasses = numel(classes);
+
+% Get class counts
+train_class_counts = zeros(1, numClasses);
+for i = 1:numClasses
+    train_class_counts(i) = sum(labelsTrain == classes{i});
+end
+
+train_total_nodes = numel(labelsTrain);
+fprintf('Class distribution (train): ');
+fprintf('%d ', train_class_counts);
+fprintf('\n');
+
+% Calculate Class Weights Inversely Proportional to Class Frequencies
+class_weights = zeros(1, numClasses);
+for class_idx = 1:numClasses
+    class_count = train_class_counts(class_idx);
+    if class_count > 0
+        class_weights(class_idx) = train_total_nodes / (numClasses * class_count);
+    else
+        class_weights(class_idx) = 1.0;
+    end
+end
+class_weights = class_weights / sum(class_weights) * numClasses;
+fprintf('Class weights: ');
+fprintf('%g ', class_weights);
+fprintf('\n');
 
 %% Create neural network model
-
-% seeds = [0,1,2,3,4];
-seeds = [5,6,7,8,9];
-
+% seeds = [5,6,7,8,9];  % Or use [0,1,2,3,4]
+seeds = [1];
 for i=1:length(seeds)
-    
     % Set fix random seed for reproducibility
     seed = seeds(i);
     rng(seed);
@@ -75,59 +113,80 @@ for i=1:length(seeds)
     parameters = struct;
     
     % Layer 1
-    numHiddenFeatureMaps = 32;
+    hidden_size = 32;
     numInputFeatures = size(XTrain,2);
     
-    sz = [numInputFeatures numHiddenFeatureMaps];
-    numOut = numHiddenFeatureMaps;
-    numIn = numInputFeatures;
-    parameters.mult1.Weights = initializeGlorot(sz,numOut,numIn,"double");
+    parameters.mult1.Weights = initializeGlorot([numInputFeatures, hidden_size], ...
+        hidden_size, numInputFeatures, "double");
+    parameters.bias1 = dlarray(zeros(1, hidden_size, "double"));
     
     % Layer 2
-    sz = [numHiddenFeatureMaps numHiddenFeatureMaps];
-    numOut = numHiddenFeatureMaps;
-    numIn = numHiddenFeatureMaps;
-    parameters.mult2.Weights = initializeGlorot(sz,numOut,numIn,"double");
+    parameters.mult2.Weights = initializeGlorot([hidden_size, hidden_size], ...
+        hidden_size, hidden_size, "double");
+    parameters.bias2 = dlarray(zeros(1, hidden_size, "double"));
     
     % Layer 3
-    classes = categories(labelsTrain);
-    numClasses = numel(classes);
-
-    
-    sz = [numHiddenFeatureMaps numClasses];
-    numOut = numClasses;
-    numIn = numHiddenFeatureMaps;
-    parameters.mult3.Weights = initializeGlorot(sz,numOut,numIn,"double");
-    
+    parameters.mult3.Weights = initializeGlorot([hidden_size, numClasses], ...
+        numClasses, hidden_size, "double");
+    parameters.bias3 = dlarray(zeros(1, numClasses, "double"));
     
     %% Training
-    
     numEpochs = 1500;
     learnRate = 0.01;
-    
     validationFrequency = 100;
     
-    % initialize params for adam
+    % Initialize params for adam
     trailingAvg = [];
     trailingAvgSq = [];
     
-    % convert data to dlarray for training
+    % Convert data to dlarray for training
     XTrain = dlarray(XTrain);
     XValidation = dlarray(XValidation);
     
-    canUseGPU = false;
-    % gpu?
+    % Use GPU if available
     if canUseGPU
         XTrain = gpuArray(XTrain);
+        XValidation = gpuArray(XValidation);
+        
+        % Move parameters to GPU
+        parameters.mult1.Weights = gpuArray(parameters.mult1.Weights);
+        parameters.bias1 = gpuArray(parameters.bias1);
+        parameters.mult2.Weights = gpuArray(parameters.mult2.Weights);
+        parameters.bias2 = gpuArray(parameters.bias2);
+        parameters.mult3.Weights = gpuArray(parameters.mult3.Weights);
+        parameters.bias3 = gpuArray(parameters.bias3);
     end
     
     % Convert labels to onehot vector encoding
-    TTrain = onehotencode(labelsTrain, 1, ClassNames=classes);
-    TValidation = onehotencode(labelsValidation, 1, ClassNames=classes);    
+    TTrain = onehotencode(labelsTrain, 2, ClassNames=classes);
+    TValidation = onehotencode(labelsValidation, 2, ClassNames=classes);    
     
     epoch = 0; %initialize epoch
     best_val = 0;
     best_params = [];
+    
+    % Create figures for real-time plotting
+    figure(1);
+    loss_plot = plot(NaN, NaN, '-o', 'LineWidth', 1.5); hold on;
+    val_loss_plot = plot(NaN, NaN, '-x', 'LineWidth', 1.5);
+    xlabel('Epoch'); ylabel('Loss');
+    title('Training and Validation Loss');
+    legend('Train Loss','Validation Loss','Location','best');
+    grid on;
+
+    figure(2);
+    acc_plot = plot(NaN, NaN, '-o', 'LineWidth', 1.5); hold on;
+    val_acc_plot = plot(NaN, NaN, '-x', 'LineWidth', 1.5);
+    xlabel('Epoch'); ylabel('Accuracy');
+    title('Training and Validation Accuracy');
+    legend('Train Accuracy','Validation Accuracy','Location','best');
+    grid on;
+    
+    % Training arrays for plotting
+    train_losses = zeros(numEpochs, 1);
+    val_losses = zeros(numEpochs, 1);
+    train_accs = zeros(numEpochs, 1);
+    val_accs = zeros(numEpochs, 1);
     
     t = tic;
     % Begin training (custom train loop)
@@ -135,83 +194,142 @@ for i=1:length(seeds)
         epoch = epoch + 1;
     
         % Evaluate the model loss and gradients.
-        [loss,gradients] = dlfeval(@modelLoss,parameters,XTrain,ATrain,TTrain);
+        [loss,gradients] = dlfeval(@modelLoss, parameters, XTrain, ATrain, TTrain);
+        train_losses(epoch) = loss;
+        
+        % Calculate training accuracy
+        YTrain = model(parameters, XTrain, ATrain);
+        YTrainClass = onehotdecode(YTrain, classes, 2);
+        train_acc = mean(YTrainClass == labelsTrain);
+        train_accs(epoch) = train_acc;
     
         % Update the network parameters using the Adam optimizer.
-        [parameters,trailingAvg,trailingAvgSq] = adamupdate(parameters,gradients, ...
-            trailingAvg,trailingAvgSq,epoch,learnRate);
+        [parameters, trailingAvg, trailingAvgSq] = adamupdate(parameters, gradients, ...
+            trailingAvg, trailingAvgSq, epoch, learnRate);
 
         % Get validation data
-        YValidation = model(parameters,XValidation,AValidation); % output inference
-        Yclass = onehotdecode(YValidation,classes,2); % convert to onehot vector
+        YValidation = model(parameters, XValidation, AValidation); % output inference
+        Yclass = onehotdecode(YValidation, classes, 2); % convert to classes
         accVal = mean(Yclass == labelsValidation); % compute accuracy over all validation data
+        val_accs(epoch) = accVal;
+        
+        % Calculate validation loss
+        lossValidation = crossentropy(YValidation, TValidation, DataFormat="BC");
+        val_losses(epoch) = lossValidation;
 
-        % update best model
+        % Update best model
         if accVal > best_val
             best_val = accVal;
             best_params = parameters;
         end
     
-        % Display the validation metrics.
-        if epoch == 1 || mod(epoch,validationFrequency) == 0
-            lossValidation = crossentropy(YValidation,TValidation,DataFormat="BC");
-            disp("Epoch = "+string(epoch));
-            disp("Loss validation = "+string(lossValidation));
-            disp("Accuracy validation = "+string(accVal));
+        % Display the validation metrics periodically
+        if epoch == 1 || mod(epoch, validationFrequency) == 0
+            disp("Epoch = " + string(epoch));
+            disp("Train loss = " + string(loss) + " | Train acc = " + string(train_acc));
+            disp("Valid loss = " + string(lossValidation) + " | Valid acc = " + string(accVal));
             toc(t);
             disp('--------------------------------------');
+            
+            % Remove or comment out the following plot updates
+            % figure(1);
+            % set(loss_plot, 'XData', 1:epoch, 'YData', train_losses(1:epoch));
+            % set(val_loss_plot, 'XData', 1:epoch, 'YData', val_losses(1:epoch));
+            % xlim([1, max(2, epoch)]);
+            % drawnow;
+            
+            % figure(2);
+            % if isvalid(acc_plot)
+            %     set(acc_plot, 'XData', 1:epoch, 'YData', train_accs(1:epoch));
+            % else
+            %     % Recreate the line if needed
+            %     figure(2);
+            %     hold on;
+            %     acc_plot = plot(1:epoch, train_accs(1:epoch), '-o', 'LineWidth', 1.5);
+            % end
+            % set(val_acc_plot, 'XData', 1:epoch, 'YData', val_accs(1:epoch));
+            % xlim([1, max(2, epoch)]);
+            % drawnow;
         end
-    
     end
     
-    % save best model
+    % Save best model
     parameters = best_params;
     
-    
     %% Testing
-    
-    [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest,featureDataTest,labelDataTest);
+    [ATest, XTest, labelsTest] = preprocessData(adjacencyDataTest, featureDataTest, labelDataTest);
     XTest = (XTest - muX)./sqrt(sigsqX);
     XTest = dlarray(XTest);
     
-    YTest = model(parameters,XTest,ATest);
-    YTest = onehotdecode(YTest,classes,2);
+    if canUseGPU
+        XTest = gpuArray(XTest);
+    end
+    
+    YTest = model(parameters, XTest, ATest);
+    YTest = onehotdecode(YTest, classes, 2);
     
     accuracy = mean(YTest == labelsTest);
-    disp("Test accuracy = "+string(accuracy));
+    disp("Test accuracy = " + string(accuracy));
     
     % Visualize test results
-    figure
-    cm = confusionchart(labelsTest,YTest, ...
+    figure(3)
+    cm = confusionchart(labelsTest, YTest, ...
         ColumnSummary="column-normalized", ...
         RowSummary="row-normalized");
-    title("GCN QM7 Confusion Chart");
+    title("GCN Node Classification Confusion Chart (seed=" + string(seed) + ")");
+    
+    % Final plots
+    figure(4);
+    subplot(1,2,1);
+    plot(1:epoch, train_losses(1:epoch), '-o', 'LineWidth', 1.5); hold on;
+    plot(1:epoch, val_losses(1:epoch), '-x', 'LineWidth', 1.5);
+    xlabel('Epoch'); ylabel('Loss');
+    title('Training and Validation Loss');
+    legend('Train Loss','Validation Loss','Location','best');
+    grid on;
+    
+    subplot(1,2,2);
+    plot(1:epoch, train_accs(1:epoch), '-o', 'LineWidth', 1.5); hold on;
+    plot(1:epoch, val_accs(1:epoch), '-x', 'LineWidth', 1.5);
+    xlabel('Epoch'); ylabel('Accuracy');
+    title('Training and Validation Accuracy');
+    legend('Train Accuracy','Validation Accuracy','Location','best');
+    grid on;
     
     % Save model
-    save("models/gcn_"+string(seed)+".mat", "accuracy", "parameters", "muX", "sigsqX", "best_val");
-
+    if ~exist('models', 'dir')
+        mkdir('models');
+    end
+    save("models/gcn_" + string(seed) + ".mat", "accuracy", "parameters", "muX", "sigsqX", "best_val", "classes");
 end
 
+%% Load and inspect saved model
+data = load("models/gcn_1.mat");
+disp(data.parameters); % Check if the structure contains mult1, mult2, mult3, etc.
 
-
-%% Helper functions %%
-%%%%%%%%%%%%%%%%%%%%%%
-
-function [adjacency,features,labels] = preprocessData(adjacencyData,featureData, labelData)
-    [adjacency, features] = preprocessPredictors(adjacencyData,featureData);
+%% Helper functions
+function [adjacency, features, labels] = preprocessData(adjacencyData, featureData, labelData)
+    [adjacency, features] = preprocessPredictors(adjacencyData, featureData);
 
     labels = [];
+    nodeIndices = zeros(0,1); % Track which nodes have labels as column vector
+    nodeCount = 0;
     
-    % Convert labels to categorical.
-    for i = 1:size(adjacencyData,2)
-        % Extract the cell content first using curly braces, then get nonzeros
+    % Convert labels to categorical and track node indices
+    for i = 1:size(adjacencyData, 2)
+        % Extract the cell content first using curly braces
         labelContent = labelData{1,i};
+        
+        % Extract features for this graph
+        A_i = adjacencyData{1,i};
+        nodesInGraph = size(A_i, 1);
         
         % Check if the content is a cell itself (nested cell array)
         if iscell(labelContent)
             if ~isempty(labelContent)
                 labelContent = labelContent{1}; % Extract from nested cell
             else
+                nodeCount = nodeCount + nodesInGraph;
                 continue; % Skip empty cells
             end
         end
@@ -219,12 +337,30 @@ function [adjacency,features,labels] = preprocessData(adjacencyData,featureData,
         % Now extract non-zero values if it's numeric
         if isnumeric(labelContent)
             T = nonzeros(labelContent);
+            if length(T) == nodesInGraph
+                % All nodes have labels - ensure column format
+                newIndices = ((nodeCount+1):(nodeCount+nodesInGraph))';
+                nodeIndices = [nodeIndices; newIndices];
+            else
+                % Only some nodes have labels - ensure column format
+                newIndices = ((nodeCount+1):(nodeCount+length(T)))';
+                nodeIndices = [nodeIndices; newIndices];
+            end
         else
             % If it's not numeric, convert or handle appropriately
             T = labelContent;
+            newIndices = ((nodeCount+1):(nodeCount+length(T)))';
+            nodeIndices = [nodeIndices; newIndices];
         end
 
         labels = [labels; T];
+        nodeCount = nodeCount + nodesInGraph;
+    end
+    
+    % Filter features and adjacency matrix to include only labeled nodes
+    if ~isempty(nodeIndices)
+        features = features(nodeIndices, :);
+        adjacency = adjacency(nodeIndices, nodeIndices);
     end
     
     labelNumbers = unique(labels);
@@ -232,7 +368,7 @@ function [adjacency,features,labels] = preprocessData(adjacencyData,featureData,
     labels = categorical(labels, labelNumbers, labelNames);
 end
 
-function [adjacency,features] = preprocessPredictors(adjacencyData,featureData)
+function [adjacency, features] = preprocessPredictors(adjacencyData, featureData)
     adjacency = sparse([]);
     features = [];
 
@@ -253,41 +389,59 @@ function [adjacency,features] = preprocessPredictors(adjacencyData,featureData)
 end
 
 function Y = model(parameters, X, A)
-    % Normalize adjacency matrix
-    A_norm = normalizeAdjacency(A);
+    % Compute normalized adjacency matrix
+    A_norm = computeA_norm(A);
     
-    % Forward pass
-    X1 = relu(A_norm * X * parameters.mult1.Weights);
-    X2 = relu(A_norm * X1 * parameters.mult2.Weights);
-    X3 = A_norm * X2 * parameters.mult3.Weights;
+    % Forward pass through GCN layers
+    X1 = relu(graphConv_withA_norm(X, A_norm, parameters.mult1.Weights, parameters.bias1));
+    X2 = relu(graphConv_withA_norm(X1, A_norm, parameters.mult2.Weights, parameters.bias2));
+    X3 = graphConv_withA_norm(X2, A_norm, parameters.mult3.Weights, parameters.bias3);
     
-    % Use softmax with the correct syntax
+    % Apply softmax for classification
     Y = softmax(X3, 'DataFormat', 'BC');
 end
 
-function [loss,gradients] = modelLoss(parameters,X,A,T)
-
-    Y = model(parameters,X,A);
-    loss = crossentropy(Y,T,DataFormat="BC");
+function [loss, gradients] = modelLoss(parameters, X, A, T)
+    Y = model(parameters, X, A);
+    loss = crossentropy(Y, T, DataFormat="BC");
     gradients = dlgradient(loss, parameters);
-
 end
 
-function ANorm = normalizeAdjacency(A)
+function A_norm = computeA_norm(A)
     if isempty(A)
-        ANorm = sparse([]);
+        A_norm = sparse([]);
         return;
     end
     
-    % Add self-connections to adjacency matrix.
+    % Add self-loops and normalize
     A = A + speye(size(A));
     
-    % Compute inverse square root of degree.
+    % Compute degree matrix and normalize
+    eps_val = 1e-10;
     degree = sum(A, 2);
-    degreeInvSqrt = sparse(sqrt(1 ./ degree));
-    degreeInvSqrt(isinf(degreeInvSqrt)) = 0; % Handle divide-by-zero cases
+    degreeInvSqrt = sparse(1 ./ sqrt(max(degree, eps_val)));
     
-    % Normalize adjacency matrix.
-    ANorm = diag(degreeInvSqrt) * A * diag(degreeInvSqrt);
+    % D^(-1/2) * A * D^(-1/2)
+    A_norm = diag(degreeInvSqrt) * A * diag(degreeInvSqrt);
 end
 
+function X_out = graphConv_withA_norm(X, A_norm, W, b)
+    % Message passing using normalized adjacency
+    if isempty(A_norm)
+        X_out = X * W + repmat(b, size(X, 1), 1);
+    else
+        X_out = A_norm * (X * W) + repmat(b, size(X, 1), 1);
+    end
+end
+
+function Y = relu(X)
+    Y = max(0, X);
+end
+
+function weights = initializeGlorot(sz, numOut, numIn, dataType)
+    Z = 2 * rand(sz, dataType) - 1;
+    bound = sqrt(6 / (numIn + numOut));
+    weights = bound * Z;
+    % Wrap in dlarray so dlgradient can trace it
+    weights = dlarray(weights);
+end

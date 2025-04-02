@@ -1,10 +1,20 @@
-function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, coulombDataTest, atomDataTest)
+function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest)
     % Verification of a Graph Neural Network
     
     %% Load parameters of gcn
-    load("models/"+modelPath+".mat");
+    data = load(modelPath);
+    disp(data); % Check the contents of the loaded file
     
-    w1 = gather(parameters.mult1.Weights);
+    % Ensure required variables are loaded
+    if isfield(data, 'muX') && isfield(data, 'sigsqX') && isfield(data, 'parameters')
+        muX = data.muX;
+        sigsqX = data.sigsqX;
+        parameters = data.parameters;
+    else
+        error("The loaded file does not contain 'muX', 'sigsqX', or 'parameters'.");
+    end
+    
+    w1 = gather(parameters.mult1.Weights); % Ensure this field exists
     w2 = gather(parameters.mult2.Weights);
     w3 = gather(parameters.mult3.Weights);
     
@@ -24,7 +34,7 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, coulombDataTest
     
     %% Start for loop for verification here, preprocess one molecule at a time
     
-    N = size(coulombDataTest, 3);
+    N = size(featureDataTest, 3);
     
     % L_inf size
     % epsilon = [0.005; 0.01; 0.02; 0.05];
@@ -39,7 +49,7 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, coulombDataTest
         for i = 1:N
 
             % Get molecule data
-            [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,N),coulombDataTest(:,:,N),atomDataTest(N,:));
+            [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,N),featureDataTest(:,:,N),labelDataTest(N,:));
             
             % normalize data
             XTest = (XTest - muX)./sqrt(sigsqX);
@@ -77,19 +87,19 @@ end
 
 %% Helper functions
 
-function [adjacency,features,labels] = preprocessData(adjacencyData,coulombData,atomData)
+function [adjacency,features,labels] = preprocessData(adjacencyData,featureData,labelData)
 
-    [adjacency, features] = preprocessPredictors(adjacencyData,coulombData);
+    [adjacency, features] = preprocessPredictors(adjacencyData,featureData);
     labels = [];
     
     % Convert labels to categorical.
     for i = 1:size(adjacencyData,3)
         % Extract and append unpadded data.
-        T = nonzeros(atomData(i,:));
+        T = nonzeros(labelData(i,:));
         labels = [labels; T];
     end
     
-    labels2 = nonzeros(atomData);
+    labels2 = nonzeros(labelData);
     assert(isequal(labels2,labels2))
     
     atomicNumbers = unique(labels);
@@ -98,7 +108,7 @@ function [adjacency,features,labels] = preprocessData(adjacencyData,coulombData,
 
 end
 
-function [adjacency,features] = preprocessPredictors(adjacencyData,coulombData)
+function [adjacency,features] = preprocessPredictors(adjacencyData,featureData)
 
     adjacency = sparse([]);
     features = [];
@@ -108,9 +118,9 @@ function [adjacency,features] = preprocessPredictors(adjacencyData,coulombData)
         numNodes = find(any(adjacencyData(:,:,i)),1,"last");
     
         A = adjacencyData(1:numNodes,1:numNodes,i);
-        X = coulombData(1:numNodes,1:numNodes,i);
+        X = featureData(1:numNodes,1:numNodes,i);
     
-        % Extract feature vector from diagonal of Coulomb matrix.
+        % Extract feature vector from diagonal of feature matrix.
         X = diag(X);
     
         % Append extracted data.
@@ -153,7 +163,19 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     
     % part 1
     newV = Xverify.V;
-    newV = reshape(newV, [n n+1]);
+    
+    % Debug the size of newV and expected dimensions
+    disp("Size of newV before reshape: " + mat2str(size(newV)));
+    disp("Expected size: [" + n + ", " + (n+1) + "]");
+
+    % Ensure the number of elements matches
+    if numel(newV) ~= n * (n+1)
+        error("Dimension mismatch: Cannot reshape newV to [" + n + ", " + (n+1) + "]");
+    end
+
+    % Reshape newV
+    newV = reshape(newV, [n, n+1]);
+    
     newV = Averify * newV;
     newV = tensorprod(newV, extractdata(weights{1}));
     newV = permute(newV, [1 4 3 2]);
