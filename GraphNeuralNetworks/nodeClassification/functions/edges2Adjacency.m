@@ -42,7 +42,11 @@ function adjacency_matrices = edges2Adjacency(dataset)
         if ~isempty(edges)
             if size(edges,1) == size(edges,2)
                 % If already NxN, assume adjacency matrix
-                adjacency = sparse(double(edges));
+                disp("data");
+                disp(class(edges));
+                disp(size(edges));
+
+                adjacency = sparse(edges);
             else
                 % Otherwise, treat as edge list
                 if size(edges,1) > size(edges,2)

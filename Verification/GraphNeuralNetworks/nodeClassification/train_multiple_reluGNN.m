@@ -14,8 +14,12 @@ end
 % For debugging/verification purposes, force CPU usage
 canUseGPU = false;
 
-%% Download data and preprocess it
-dataFile = "C:/Users/Noah/OneDrive - Vanderbilt/Spring 2025/CS 6315/Project/AV_Project/Data/node.mat";
+projectRoot = getenv('AV_PROJECT_HOME');
+if isempty(projectRoot)
+    error('AV_PROJECT_HOME environment variable is not set. Please set it to your project root directory.');
+end
+dataFile = fullfile(projectRoot, 'data', 'node.mat');
+data = load(dataFile);
 
 data = load(dataFile);
 disp(data);
@@ -34,13 +38,13 @@ end
 % Convert data to adjacency form
 adjacencyData = edges2Adjacency(data);
 % Print first adjacency matrix and features
-disp("First adjacency matrix:");
-disp(adjacencyData{1});
-disp("First feature matrix:");
-disp(featureData{1});
+% disp("First adjacency matrix:");
+% disp(adjacencyData{1});
+% disp("First feature matrix:");
+% disp(featureData{1});
 
 % Check adjacencyData dimensions
-disp("Size of adjacencyData: " + mat2str(size(adjacencyData)));
+% disp("Size of adjacencyData: " + mat2str(size(adjacencyData)));
 
 % Partition data
 numObservations = size(adjacencyData, 2);
@@ -66,9 +70,8 @@ labelDataTest = labelData(1,idxTest);
 [AValidation,XValidation,labelsValidation] = preprocessData(adjacencyDataValidation,featureDataValidation,labelDataValidation);
 
 % Print first 10 adjacency matrices and features
-disp("First 10 adjacency matrices:");
-disp(ATrain(1:10));
-
+% disp("First 10 adjacency matrices:");
+% disp(ATrain(1:10));
 
 % Normalize training data
 muX = mean(XTrain);
@@ -141,7 +144,7 @@ for i=1:length(seeds)
     parameters.bias3 = dlarray(zeros(1, numClasses, "double"));
     
     %% Training
-    numEpochs = 1500;
+    numEpochs = 200;
     learnRate = 0.01;
     validationFrequency = 100;
     
@@ -240,26 +243,6 @@ for i=1:length(seeds)
             disp("Valid loss = " + string(lossValidation) + " | Valid acc = " + string(accVal));
             toc(t);
             disp('--------------------------------------');
-            
-            % Remove or comment out the following plot updates
-            % figure(1);
-            % set(loss_plot, 'XData', 1:epoch, 'YData', train_losses(1:epoch));
-            % set(val_loss_plot, 'XData', 1:epoch, 'YData', val_losses(1:epoch));
-            % xlim([1, max(2, epoch)]);
-            % drawnow;
-            
-            % figure(2);
-            % if isvalid(acc_plot)
-            %     set(acc_plot, 'XData', 1:epoch, 'YData', train_accs(1:epoch));
-            % else
-            %     % Recreate the line if needed
-            %     figure(2);
-            %     hold on;
-            %     acc_plot = plot(1:epoch, train_accs(1:epoch), '-o', 'LineWidth', 1.5);
-            % end
-            % set(val_acc_plot, 'XData', 1:epoch, 'YData', val_accs(1:epoch));
-            % xlim([1, max(2, epoch)]);
-            % drawnow;
         end
     end
     
@@ -270,8 +253,6 @@ for i=1:length(seeds)
     [ATest, XTest, labelsTest] = preprocessData(adjacencyDataTest, featureDataTest, labelDataTest);
     XTest = (XTest - muX)./sqrt(sigsqX);
     XTest = dlarray(XTest);
-    
-
     
     if canUseGPU
         XTest = gpuArray(XTest);
@@ -315,11 +296,11 @@ for i=1:length(seeds)
     
 
     % Save model parameters and training results
-    save("models/gcn_" + string(seed) + ".mat", "accuracy", "parameters", "muX", "sigsqX", "best_val", "classes");
+    save("models/node_gcn_" + string(seed) + ".mat", "accuracy", "parameters", "muX", "sigsqX", "best_val", "classes");
 end
 
 %% Load and inspect saved model
-data = load("models/gcn_1.mat");
+data = load("models/node_gcn_1.mat");
 disp(data.parameters); % Check if the structure contains mult1, mult2, mult3, etc.
 
 %% Helper functions
@@ -443,9 +424,9 @@ end
 function X_out = graphConv_withA_norm(X, A_norm, W, b)
     % Message passing using normalized adjacency
     if isempty(A_norm)
-        X_out = X * W + repmat(b, size(X, 1), 1);
+        X_out = double(X) * double(W) + repmat(b, size(X, 1), 1);
     else
-        X_out = A_norm * (X * W) + repmat(b, size(X, 1), 1);
+        X_out = double(A_norm) * (double(X) * double(W)) + repmat(b, size(X, 1), 1);
     end
 end
 
