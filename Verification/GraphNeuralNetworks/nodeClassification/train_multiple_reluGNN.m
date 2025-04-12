@@ -33,6 +33,11 @@ end
 
 % Convert data to adjacency form
 adjacencyData = edges2Adjacency(data);
+% Print first adjacency matrix and features
+disp("First adjacency matrix:");
+disp(adjacencyData{1});
+disp("First feature matrix:");
+disp(featureData{1});
 
 % Check adjacencyData dimensions
 disp("Size of adjacencyData: " + mat2str(size(adjacencyData)));
@@ -59,6 +64,11 @@ labelDataTest = labelData(1,idxTest);
 % Convert data for training
 [ATrain,XTrain,labelsTrain] = preprocessData(adjacencyDataTrain,featureDataTrain,labelDataTrain);
 [AValidation,XValidation,labelsValidation] = preprocessData(adjacencyDataValidation,featureDataValidation,labelDataValidation);
+
+% Print first 10 adjacency matrices and features
+disp("First 10 adjacency matrices:");
+disp(ATrain(1:10));
+
 
 % Normalize training data
 muX = mean(XTrain);
@@ -261,6 +271,8 @@ for i=1:length(seeds)
     XTest = (XTest - muX)./sqrt(sigsqX);
     XTest = dlarray(XTest);
     
+
+    
     if canUseGPU
         XTest = gpuArray(XTest);
     end
@@ -300,6 +312,9 @@ for i=1:length(seeds)
     if ~exist('models', 'dir')
         mkdir('models');
     end
+    
+
+    % Save model parameters and training results
     save("models/gcn_" + string(seed) + ".mat", "accuracy", "parameters", "muX", "sigsqX", "best_val", "classes");
 end
 

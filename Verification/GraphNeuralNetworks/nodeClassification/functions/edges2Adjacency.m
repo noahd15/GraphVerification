@@ -40,17 +40,21 @@ function adjacency_matrices = edges2Adjacency(dataset)
         
         % Fill adjacency matrix using edge indices
         if ~isempty(edges)
-            % Ensure edges are valid indices
-            valid_edges = edges > 0 & edges <= num_nodes & round(edges) == edges;
-            if size(valid_edges, 1) >= 2
-                valid_idx = all(valid_edges(1:2,:), 1);
-                
-                % Extract source and target nodes for valid edges
-                sources = edges(1, valid_idx);
-                targets = edges(2, valid_idx);
-                
-                % Create sparse adjacency matrix directly
-                adjacency = sparse(sources, targets, ones(1, length(sources)), num_nodes, num_nodes);
+            if size(edges,1) == size(edges,2)
+                % If already NxN, assume adjacency matrix
+                adjacency = sparse(edges);
+            else
+                % Otherwise, treat as edge list
+                if size(edges,1) > size(edges,2)
+                    edges = edges';
+                end
+                valid_edges = (edges(1,:) > 0 & edges(1,:) <= num_nodes) & ...
+                              (edges(2,:) > 0 & edges(2,:) <= num_nodes);
+                sources = edges(1, valid_edges);
+                targets = edges(2, valid_edges);
+                if ~isempty(sources)
+                    adjacency = sparse(sources, targets, 1, num_nodes, num_nodes);
+                end
             end
         end
         

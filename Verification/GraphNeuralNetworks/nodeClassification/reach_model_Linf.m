@@ -1,10 +1,15 @@
-function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest)
+function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest, batchSize)
     % Verification of a Graph Neural Network
+    
+    % Add default batch size if not provided
+    if nargin < 6
+        batchSize = 50; % Default batch size
+    end
     
     %% Load parameters of gcn
     data = load(modelPath);
     disp(data); % Check the contents of the loaded file
-    
+ 
     % Ensure required variables are loaded
     if isfield(data, 'muX') && isfield(data, 'sigsqX') && isfield(data, 'parameters')
         muX = data.muX;
@@ -54,7 +59,7 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
             % normalize data
             XTest = (XTest - muX)./sqrt(sigsqX);
             XTest = dlarray(XTest);
-                    
+      
             % adjacency matrix represent connections, so keep it as is
             Averify = normalizeAdjacency(ATest);
             
@@ -62,14 +67,16 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
             lb = extractdata(XTest-epsilon(k));
             ub = extractdata(XTest+epsilon(k));
             Xverify = ImageStar(lb,ub);
+            fprintf('Size of Xverify %s\n', mat2str(size(Xverify.V)));
             
             % Compute reachability
             t = tic;
             
             reachMethod = 'approx-star';
             L = ReluLayer(); % Create relu layer;
-            
-            Y = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, Averify);
+
+            % Pass batch size to computeReachability
+            Y = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, full(Averify), batchSize);
 
             % store results
             outputSets{i} = Y;
@@ -91,6 +98,7 @@ function [adjacency,features,labels] = preprocessData(adjacencyData,featureData,
 
     [adjacency, features] = preprocessPredictors(adjacencyData,featureData);
     labels = [];
+    
     
     % Convert labels to categorical.
     for i = 1:size(adjacencyData,3)
@@ -114,17 +122,15 @@ function [adjacency,features] = preprocessPredictors(adjacencyData,featureData)
     features = [];
     
     for i = 1:size(adjacencyData, 3)
-        % Extract unpadded data.
-        numNodes = find(any(adjacencyData(:,:,i)),1,"last");
-    
+        numNodes = find(any(adjacencyData(:,:,i)), 1, "last");
+        if isempty(numNodes) || numNodes == 0
+            % Fallback to full size if no nonzero rows found.
+            numNodes = size(adjacencyData(:,:,i),1);
+        end
         A = adjacencyData(1:numNodes,1:numNodes,i);
         X = featureData(1:numNodes,1:numNodes,i);
-    
-        % Extract feature vector from diagonal of feature matrix.
         X = diag(X);
-    
-        % Append extracted data.
-        adjacency = blkdiag(adjacency,A);
+        adjacency = blkdiag(adjacency, A);
         features = [features; X];
     end
 
@@ -147,43 +153,74 @@ function ANorm = normalizeAdjacency(A)
 
 end
 
-function Y = computeReachability(weights, L, reachMethod, input, adjMat)
+function Y = computeReachability(weights, L, reachMethod, input, adjMat, batchSize)
     % weights = weights of GNN ({w1, w2, w3}
     % L = Layer type (ReLU)
     % reachMethod = reachability method for all layers('approx-star is default)
     % input = pertubed input features (ImageStar)
     % adjMat = adjacency matric of corresonding input features
+    % batchSize = size of batches to process
     % Y = computed output of GNN (ImageStar)
 
     Xverify = input;
     Averify = adjMat;
     n = size(adjMat,1);
-    
+   
     %%%%%%%%  LAYER 1  %%%%%%%%
     
     % part 1
     newV = Xverify.V;
+    disp("Size of input tensor: " + mat2str(size(newV)));
     
-    % Debug the size of newV and expected dimensions
-    disp("Size of newV before reshape: " + mat2str(size(newV)));
-    disp("Expected size: [" + n + ", " + (n+1) + "]");
-
-    % Ensure the number of elements matches
-    if numel(newV) ~= n * (n+1)
-        error("Dimension mismatch: Cannot reshape newV to [" + n + ", " + (n+1) + "]");
+    % Get dimensions from the actual data
+    [inputRows, inputCols] = size(newV);
+    fprintf("Input dimensions: [%d, %d]\n", inputRows, inputCols);
+    
+    % Process in batches to avoid memory issues
+    resultV = [];
+    numBatches = ceil(inputCols / batchSize);
+    
+    for b = 1:numBatches
+        startIdx = (b-1)*batchSize + 1;
+        endIdx = min(b*batchSize, inputCols);
+        fprintf("Processing batch %d/%d (columns %d to %d)\n", b, numBatches, startIdx, endIdx);
+        
+        % Extract batch
+        batchV = newV(:, startIdx:endIdx);
+        
+        % Process batch
+        batchResult = Averify * batchV;
+        batchResult = tensorprod(batchResult, extractdata(weights{1}));
+        
+        % Collect results
+        if isempty(resultV)
+            resultV = batchResult;
+        else
+            resultV = cat(2, resultV, batchResult);
+        end
     end
-
-    % Reshape newV
-    newV = reshape(newV, [n, n+1]);
     
-    newV = Averify * newV;
-    newV = tensorprod(newV, extractdata(weights{1}));
-    newV = permute(newV, [1 4 3 2]);
-    X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
+    % Final transformation
+    resultV = permute(resultV, [1 4 3 2]);
+    X2 = ImageStar(resultV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
     
     % part 2
     X2b = L.reach(X2, reachMethod);
-    repV = repmat(Xverify.V,[1,32,1,1]);
+    
+    % Process replication in batches if needed
+    if prod(size(Xverify.V)) > 1e7 % Threshold for batch processing
+        repV = [];
+        for b = 1:numBatches
+            startIdx = (b-1)*batchSize + 1;
+            endIdx = min(b*batchSize, size(Xverify.V,2));
+            batchV = Xverify.V(:, startIdx:endIdx);
+            batchRepV = repmat(batchV, [1, 32, 1, 1]);
+            repV = cat(2, repV, batchRepV);
+        end
+    else
+        repV = repmat(Xverify.V, [1, 32, 1, 1]);
+    end
+    
     Xrep = ImageStar(repV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
     X2b_ = X2b.MinkowskiSum(Xrep);
     

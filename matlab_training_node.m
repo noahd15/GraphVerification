@@ -14,6 +14,14 @@ useGPU = false;
 %% Load Data
 data = load('data/dataset_matlab_node.mat');
 
+% Print first 10 adjacency matrices and features for debugging
+for i = 1:10
+    fprintf('Adjacency matrix %d:\n', i);
+    disp(data.edge_indices{i});
+    fprintf('Features %d:\n', i);
+    disp(data.features{i});
+end
+
 % Ensure every label cell is a column vector.
 for i = 1:length(data.labels)
     if isrow(data.labels{i})
