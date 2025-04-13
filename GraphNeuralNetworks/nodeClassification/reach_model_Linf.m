@@ -1,28 +1,14 @@
 function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, coulombDataTest, atomDataTest)
     % Verification of a Graph Neural Network
     
-    %% Load parameters of gcn
-    load("models/"+modelPath+".mat");
+    % Load parameters of gcn
+    load("/Users/kendragivens/Documents/jupyter/Verification/AV_Project/GraphNeuralNetworks/nodeClassification/models/"+modelPath+".mat");
     
     w1 = gather(parameters.mult1.Weights);
     w2 = gather(parameters.mult2.Weights);
     w3 = gather(parameters.mult3.Weights);
     
-    % model function
-    %     ANorm => adjacency matrix of A
-    %     Z1 => input
-    % 
-    %     Z2 = ANorm * Z1 * w1;
-    %     Z2 = relu(Z2) + Z1; (layer 1)
-    % 
-    %     Z3 = ANorm * Z2 * w2;
-    %     Z3 = relu(Z3) + Z2; (layer 2)
-    % 
-    %     Z4 = ANorm * Z3 * w3;
-    %     Y = softmax(Z4,DataFormat="BC"); (output layer)
-
-    
-    %% Start for loop for verification here, preprocess one molecule at a time
+    % Start for loop for verification here, preprocess one molecule at a time
     
     N = size(coulombDataTest, 3);
     
@@ -52,6 +38,7 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, coulombDataTest
             lb = extractdata(XTest-epsilon(k));
             ub = extractdata(XTest+epsilon(k));
             Xverify = ImageStar(lb,ub);
+            % fprintf('Size of Xverify %s\n', mat2str(size(Xverify.V)));
             
             % Compute reachability
             t = tic;
@@ -182,5 +169,4 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     Y = ImageStar(newV, X3b_.C, X3b_.d, X3b_.pred_lb, X3b_.pred_ub);
 
 end
-
 

@@ -1,7 +1,7 @@
-%% Train multiple models to evaluate and certify accuracy and certified accuracy
+% Train multiple models to evaluate and certify accuracy and certified accuracy
 % For now, do 5 different random seeds and save the model to analyze later
 
-%% GPU Setup Check
+% GPU Setup Check
 if gpuDeviceCount > 0
     g = gpuDevice(1);
     fprintf('GPU detected: %s. Using GPU features.\n', g.Name);
@@ -83,7 +83,7 @@ end
 XTrain = (XTrain - muX) ./ sqrt(sigsqX);
 XValidation = (XValidation - muX)./sqrt(sigsqX);
 
-%% Calculate Class Counts from Training Labels (for class weights)
+% Calculate Class Counts from Training Labels (for class weights)
 classes = categories(labelsTrain);
 numClasses = numel(classes);
 % Get class counts
@@ -112,7 +112,7 @@ fprintf('Class weights: ');
 fprintf('%g ', class_weights);
 fprintf('\n');
 
-%% Create neural network model
+% Create neural network model
 % seeds = [5,6,7,8,9];  % Or use [0,1,2,3,4]
 seeds = [1];
 for i=1:length(seeds)
@@ -141,7 +141,7 @@ for i=1:length(seeds)
         numClasses, hidden_size, "double");
     parameters.bias3 = dlarray(zeros(1, numClasses, "double"));
     
-    %% Training
+    % Training
     numEpochs = 200;
     learnRate = 0.01;
     validationFrequency = 100;
@@ -247,7 +247,7 @@ for i=1:length(seeds)
     % Save best model
     parameters = best_params;
     
-    %% Testing
+    % Testing
     [ATest, XTest, labelsTest] = preprocessData(adjacencyDataTest, featureDataTest, labelDataTest);
     XTest = (XTest - muX)./sqrt(sigsqX);
     XTest = dlarray(XTest);
@@ -297,11 +297,11 @@ for i=1:length(seeds)
     save("models/node_gcn_" + string(seed) + ".mat", "accuracy", "parameters", "muX", "sigsqX", "best_val", "classes");
 end
 
-%% Load and inspect saved model
+% Load and inspect saved model
 data = load("models/node_gcn_1.mat");
 disp(data.parameters); % Check if the structure contains mult1, mult2, mult3, etc.
 
-%% Helper functions
+% Helper functions
 function [adjacency, features, labels] = preprocessData(adjacencyData, featureData, labelData)
     [adjacency, features] = preprocessPredictors(adjacencyData, featureData);
 

@@ -1,7 +1,7 @@
 %% Train multiple models to evaluate and certify accuracy and certified accuracy
 % For now, do 5 different random seeds and save the model to analyze later
 
-%% Download data and preprocess it
+% Download data and preprocess it
 
 dataURL = "http://quantum-machine.org/data/qm7.mat";
 outputFolder = fullfile(tempdir,"qm7Data");
@@ -81,10 +81,10 @@ XTrain = (XTrain - muX)./sqrt(sigsqX);
 XValidation = (XValidation - muX)./sqrt(sigsqX);
 
 
-%% Create neural network model
+% Create neural network model
 
 % seeds = [0,1,2,3,4];
-seeds = [5,6,7,8,9];
+seeds = [1] % [5,6,7,8,9];
 
 for i=1:length(seeds)
     
@@ -120,9 +120,9 @@ for i=1:length(seeds)
     parameters.mult3.Weights = initializeGlorot(sz,numOut,numIn,"double");
     
     
-    %% Training
+    % Training
     
-    numEpochs = 1500;
+    numEpochs = 5;
     learnRate = 0.01;
     
     validationFrequency = 100;
@@ -187,7 +187,7 @@ for i=1:length(seeds)
     parameters = best_params;
     
     
-    %% Testing
+    % Testing
     
     [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest,coulombDataTest,atomDataTest);
     XTest = (XTest - muX)./sqrt(sigsqX);
@@ -213,7 +213,7 @@ end
 
 
 
-%% Helper functions %%
+% Helper functions %%
 %%%%%%%%%%%%%%%%%%%%%%
 
 function [adjacency,features,labels] = preprocessData(adjacencyData,coulombData,atomData)

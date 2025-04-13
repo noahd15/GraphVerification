@@ -5,11 +5,8 @@
 % 4 different size of Linf attacks
 
 
-%% Load data
-projectRoot = getenv('AV_PROJECT_HOME');
+% Load data
 
-addpath(genpath(fullfile(projectRoot, '/GraphNeuralNetworks/nodeClassification/functions/')))
-addpath(genpath(fullfile(projectRoot, '/GraphNeuralNetworks/nodeClassification/models/')))
 rng(0); % ensure we can reproduce (data partition)
 
 dataURL = "http://quantum-machine.org/data/qm7.mat";
@@ -31,6 +28,8 @@ coulombData = double(permute(data.X, [2 3 1]));
 atomData = sort(data.Z,2,'descend');
 % convert data to adjacency form
 adjacencyData = coulomb2Adjacency(coulombData,atomData);
+disp("ADJ");
+disp(size(adjacencyData));
 
 % Partition data
 numObservations = size(adjacencyData,3);
@@ -41,12 +40,15 @@ adjacencyDataTest = adjacencyData(:,:,idxTest);
 coulombDataTest = coulombData(:,:,idxTest);
 atomDataTest = atomData(idxTest,:);
 
+disp("ADJ Test");
+disp(size(adjacencyDataTest));
+
 %% Verify models
 
 % Study Variables
 % seeds = [0,1,2,3,4]; % models
-seeds = [5,6,7,8,9]; % models
-epsilon = [0.005, 0.01, 0.02, 0.05]; % attack
+seeds = [1] %[5,6,7,8,9]; % models
+epsilon = [0.005] %[0.005, 0.01, 0.02, 0.05]; % attack
 
 % Verify one model at a time
 parfor k=1:length(seeds)
@@ -58,4 +60,3 @@ parfor k=1:length(seeds)
     reach_model_Linf(modelPath, epsilon, adjacencyDataTest, coulombDataTest, atomDataTest);
 
 end
-

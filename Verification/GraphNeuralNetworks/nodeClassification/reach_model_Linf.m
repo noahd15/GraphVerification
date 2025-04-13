@@ -6,7 +6,7 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
         batchSize = 512; % Default batch size
     end
     
-    %% Load parameters of gcn
+    % Load parameters of gcn
     data = load(modelPath);
     disp(data); % Check the contents of the loaded file
  
@@ -24,7 +24,7 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
     w3 = gather(parameters.mult3.Weights);
     
     
-    %% Start for loop for verification here, preprocess one molecule at a time
+    % Start for loop for verification here, preprocess one molecule at a time
     
     N = size(featureDataTest, 3);
     
@@ -83,7 +83,7 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
 
 end
 
-%% Helper functions
+% Helper functions
 
 function [adjacency,features,labels] = preprocessData(adjacencyData,featureData,labelData)
 

@@ -9,16 +9,16 @@ projectRoot = getenv('AV_PROJECT_HOME');
 addpath(genpath(fullfile(projectRoot, '/Verification/GraphNeuralNetworks/nodeClassification/functions/')))
 addpath(genpath(fullfile(projectRoot, '/Verification/GraphNeuralNetworks/nodeClassification/models/')))
 
-% addpath(genpath('C:/Users/Noah/nnv'))
-%% Load data
+% Load data
 dataset = load('../../../data/node.mat');
 rng(0); % ensure we can reproduce (data partition)
 
 % Convert edge indices to adjacency matrices
 adjacency_matrices = edges2Adjacency(dataset);
+disp("ADJ");
+disp(size(adjacency_matrices));
 
 % Partition data
-
 numObservations = length(dataset.edge_indices);
 [idxTrain, idxVal, idxTest] = trainingPartitions(numObservations,[0.8 0.1 0.1]);
 
@@ -46,6 +46,9 @@ end
 adjacencyDataTest = zeros(max_nodes, max_nodes, num_test);
 featureDataTest = zeros(max_nodes, max_features, num_test);
 labelDataTest = zeros(num_test, max_nodes);
+
+disp("ADJ Test");
+disp(size(adjacencyDataTest));
 
 % Fill the matrices with data, padding as needed
 for i = 1:num_test

@@ -1,7 +1,7 @@
-% edges2Adjacency.m
-function adjacency_matrices = edges2Adjacency(dataset)
-    % Convert edge indices to adjacency matrices for each data point
-    % 
+function adjacency_tensor = edges2Adjacency(dataset)
+    % Convert edge indices to adjacency matrices for each data point,
+    % and return a 3D numeric array of size [num_nodes, num_nodes, num_graphs].
+    %
     % Input:
     %   dataset - structure with fields:
     %     - edge_indices: {1×n cell} of edge indices for each graph
@@ -9,55 +9,57 @@ function adjacency_matrices = edges2Adjacency(dataset)
     %     - labels: {1×n cell} of labels
     %
     % Output:
-    %   adjacency_matrices - {1×n cell} of adjacency matrices
-
-    num_graphs = length(dataset.edge_indices);
-    adjacency_matrices = cell(1, num_graphs);
+    %   adjacency_tensor - numeric array of size [num_nodes, num_nodes, num_graphs]
     
+    num_graphs = length(dataset.edge_indices);
+    
+    % Assume all graphs have the same number of nodes. Use the first graph's feature data.
+    if ~isempty(dataset.features{1})
+        num_nodes = size(dataset.features{1}, 1);
+    else
+        % If features of the first graph are empty, infer from the first edge index list.
+        num_nodes = max(dataset.edge_indices{1}(:));
+    end
+    
+    % Preallocate a 3D numeric array
+    adjacency_tensor = zeros(num_nodes, num_nodes, num_graphs);
+    
+    % Process each graph
     for i = 1:num_graphs
-        % Get edge indices for this graph
         edges = dataset.edge_indices{i};
+        % Determine the number of nodes for this graph.
+        % (We assume all graphs are fixed to num_nodes; if not, one could use:
+        %  n = size(dataset.features{i}, 1); )
+        n = num_nodes;
         
-        % Get number of nodes from features
-        num_nodes = size(dataset.features{i}, 1);
-        if num_nodes == 0
-            % If features don't provide node count, try inferring from edges
-            if ~isempty(edges)
-                num_nodes = max(edges(:));
-            else
-                num_nodes = 0;
-            end
-        end
+        % Initialize a numeric adjacency matrix for the current graph.
+        adjacency = zeros(n, n);
         
-        % Skip if no nodes
-        if num_nodes == 0
-            adjacency_matrices{i} = sparse(0, 0);
-            continue;
-        end
-        
-        % Initialize adjacency matrix
-        adjacency = sparse(num_nodes, num_nodes);
-        
-        % Fill adjacency matrix using edge indices
         if ~isempty(edges)
             if size(edges,1) == size(edges,2)
-                % If already NxN, assume adjacency matrix
-                adjacency = sparse(double(edges));
+                % If the provided edges are already in an NxN format,
+                % then just copy the relevant block.
+                adjacency = full(double(edges));
             else
-                % Otherwise, treat as edge list
+                % Otherwise, treat edges as an edge list.
+                % Ensure that edges is 2-by-num_edges.
                 if size(edges,1) > size(edges,2)
                     edges = edges';
                 end
-                valid_edges = (edges(1,:) > 0 & edges(1,:) <= num_nodes) & ...
-                              (edges(2,:) > 0 & edges(2,:) <= num_nodes);
+                valid_edges = (edges(1,:) > 0 & edges(1,:) <= n) & ...
+                              (edges(2,:) > 0 & edges(2,:) <= n);
                 sources = edges(1, valid_edges);
                 targets = edges(2, valid_edges);
-                if ~isempty(sources)
-                    adjacency = sparse(sources, targets, 1, num_nodes, num_nodes);
+                % Populate the adjacency matrix.
+                for j = 1:length(sources)
+                    adjacency(sources(j), targets(j)) = 1;
+                    % Optionally, add symmetry if the graph is undirected:
+                    % adjacency(targets(j), sources(j)) = 1;
                 end
             end
         end
         
-        adjacency_matrices{i} = adjacency;
+        % Store the computed adjacency in the 3D array.
+        adjacency_tensor(:, :, i) = adjacency;
     end
 end
