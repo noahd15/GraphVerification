@@ -3,7 +3,7 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
     
     % Add default batch size if not provided
     if nargin < 6
-        batchSize = 50; % Default batch size
+        batchSize = 512; % Default batch size
     end
     
     %% Load parameters of gcn
@@ -23,19 +23,6 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
     w2 = gather(parameters.mult2.Weights);
     w3 = gather(parameters.mult3.Weights);
     
-    % model function
-    %     ANorm => adjacency matrix of A
-    %     Z1 => input
-    % 
-    %     Z2 = ANorm * Z1 * w1;
-    %     Z2 = relu(Z2) + Z1; (layer 1)
-    % 
-    %     Z3 = ANorm * Z2 * w2;
-    %     Z3 = relu(Z3) + Z2; (layer 2)
-    % 
-    %     Z4 = ANorm * Z3 * w3;
-    %     Y = softmax(Z4,DataFormat="BC"); (output layer)
-
     
     %% Start for loop for verification here, preprocess one molecule at a time
     
@@ -53,8 +40,12 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
     
         for i = 1:N
 
-            % Get molecule data
-            [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,N),featureDataTest(:,:,N),labelDataTest(N,:));
+            % [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,N),featureDataTest(:,:,N),labelDataTest(N,:));
+
+            for i = 1:N
+                [ATest, XTest, labelsTest] = preprocessData(adjacencyDataTest(:,:,i), featureDataTest(:,:,i), labelDataTest(i,:) );
+            end
+
             
             % normalize data
             XTest = (XTest - muX)./sqrt(sigsqX);
@@ -99,7 +90,6 @@ function [adjacency,features,labels] = preprocessData(adjacencyData,featureData,
     [adjacency, features] = preprocessPredictors(adjacencyData,featureData);
     labels = [];
     
-    
     % Convert labels to categorical.
     for i = 1:size(adjacencyData,3)
         % Extract and append unpadded data.
@@ -115,7 +105,7 @@ function [adjacency,features,labels] = preprocessData(adjacencyData,featureData,
     labels = categorical(labels, atomicNumbers, atomNames);
 
 end
-
+ 
 function [adjacency,features] = preprocessPredictors(adjacencyData,featureData)
 
     adjacency = sparse([]);
@@ -154,14 +144,6 @@ function ANorm = normalizeAdjacency(A)
 end
 
 function Y = computeReachability(weights, L, reachMethod, input, adjMat, batchSize)
-    % weights = weights of GNN ({w1, w2, w3}
-    % L = Layer type (ReLU)
-    % reachMethod = reachability method for all layers('approx-star is default)
-    % input = pertubed input features (ImageStar)
-    % adjMat = adjacency matric of corresonding input features
-    % batchSize = size of batches to process
-    % Y = computed output of GNN (ImageStar)
-
     Xverify = input;
     Averify = adjMat;
     n = size(adjMat,1);

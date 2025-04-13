@@ -27,7 +27,6 @@ disp(data);
 % Extract the feature data and the label data
 featureData = data.features;
 labelData = data.labels;
-
 % Ensure every label cell is a column vector
 for i = 1:length(labelData)
     if isrow(labelData{i})
@@ -87,7 +86,6 @@ XValidation = (XValidation - muX)./sqrt(sigsqX);
 %% Calculate Class Counts from Training Labels (for class weights)
 classes = categories(labelsTrain);
 numClasses = numel(classes);
-
 % Get class counts
 train_class_counts = zeros(1, numClasses);
 for i = 1:numClasses
@@ -332,7 +330,8 @@ function [adjacency, features, labels] = preprocessData(adjacencyData, featureDa
         
         % Now extract non-zero values if it's numeric
         if isnumeric(labelContent)
-            T = nonzeros(labelContent);
+            % T = nonzeros(labelContent);
+            T = labelContent;
             if length(T) == nodesInGraph
                 % All nodes have labels - ensure column format
                 newIndices = ((nodeCount+1):(nodeCount+nodesInGraph))';

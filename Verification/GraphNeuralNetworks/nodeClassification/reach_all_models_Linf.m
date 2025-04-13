@@ -4,17 +4,21 @@
 % Same data for all
 % 4 different size of Linf attacks
 
-addpath(genpath('C:/Users/Noah/OneDrive - Vanderbilt/Spring 2025/CS 6315/Project/AV_Project/Verification/GraphNeuralNetworks/nodeClassification/functions/'));
-addpath(genpath("C:/Users/Noah/OneDrive - Vanderbilt/Spring 2025/CS 6315/Project/AV_Project/Verification/GraphNeuralNetworks/nodeClassification/models/"));
-addpath(genpath('C:/Users/Noah/nnv'))
+projectRoot = getenv('AV_PROJECT_HOME');
+
+addpath(genpath(fullfile(projectRoot, '/Verification/GraphNeuralNetworks/nodeClassification/functions/')))
+addpath(genpath(fullfile(projectRoot, '/Verification/GraphNeuralNetworks/nodeClassification/models/')))
+
+% addpath(genpath('C:/Users/Noah/nnv'))
 %% Load data
-dataset = load('../../../Data/node.mat');
+dataset = load('../../../data/node.mat');
 rng(0); % ensure we can reproduce (data partition)
 
 % Convert edge indices to adjacency matrices
 adjacency_matrices = edges2Adjacency(dataset);
 
 % Partition data
+
 numObservations = length(dataset.edge_indices);
 [idxTrain, idxVal, idxTest] = trainingPartitions(numObservations,[0.8 0.1 0.1]);
 
@@ -73,12 +77,12 @@ end
 % Study Variables
 % seeds = [0,1,2,3,4]; % models
 seeds = [1]; % models
-epsilon = [0.005, 0.01, 0.02, 0.05]; % attack
+epsilon = [0.005]% , 0.01, 0.02, 0.05]; % attack
 
 % Verify one model at a time
 parfor k = 1:length(seeds)
     % Construct the model path
-    modelPath = "models/gcn_" + string(seeds(k)) + ".mat";
+    modelPath = "models/node_gcn_" + string(seeds(k)) + ".mat";
 
     % Verify the model
     reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest);
