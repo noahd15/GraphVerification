@@ -20,41 +20,15 @@ data = load(dataFile);
 % Extract the Coulomb data and the atomic numbers from the loaded structure. 
 % Permute the Coulomb data so that the third dimension corresponds to the observations. 
 coulombData = double(permute(data.X, [2 3 1]));
+
 % Sort the atomic numbers in descending order.
 atomData = sort(data.Z,2,'descend');
+
 % convert data to adjacency form
 adjacencyData = coulomb2Adjacency(coulombData,atomData);
 
-% Visualize data
-figure
-tiledlayout("flow")
-
-for i = 1:9
-    % Extract unpadded adjacency matrix.
-    atomicNumbers = nonzeros(atomData(i,:));
-    numNodes = numel(atomicNumbers);
-    A = adjacencyData(1:numNodes,1:numNodes,i);
-
-    % Convert adjacency matrix to graph.
-    G = graph(A);
-
-    % Convert atomic numbers to symbols.
-    symbols = atomicSymbol(atomicNumbers);
-
-    % Plot graph.
-    nexttile
-    plot(G,NodeLabel=symbols,Layout="force")
-    title("Molecule " + i)
-end
-
-figure
-histogram(categorical(atomicSymbol(atomData)))
-xlabel("Node Label")
-ylabel("Frequency")
-title("Label Counts")
-
-% Partition data
 numObservations = size(adjacencyData,3);
+
 [idxTrain,idxValidation,idxTest] = trainingPartitions(numObservations,[0.8 0.1 0.1]);
 
 adjacencyDataTrain = adjacencyData(:,:,idxTrain);
@@ -79,8 +53,6 @@ sigsqX = var(XTrain,1);
 
 XTrain = (XTrain - muX)./sqrt(sigsqX);
 XValidation = (XValidation - muX)./sqrt(sigsqX);
-
-
 % Create neural network model
 
 % seeds = [0,1,2,3,4];
@@ -125,7 +97,7 @@ for i=1:length(seeds)
     numEpochs = 5;
     learnRate = 0.01;
     
-    validationFrequency = 100;
+    validationFrequency = 1;
     
     % initialize params for adam
     trailingAvg = [];
@@ -200,11 +172,11 @@ for i=1:length(seeds)
     disp("Test accuracy = "+string(accuracy));
     
     % Visualize test results
-    figure
-    cm = confusionchart(labelsTest,YTest, ...
-        ColumnSummary="column-normalized", ...
-        RowSummary="row-normalized");
-    title("GCN QM7 Confusion Chart");
+    % figure
+    % cm = confusionchart(labelsTest,YTest, ...
+    %     ColumnSummary="column-normalized", ...
+    %     RowSummary="row-normalized");
+    % title("GCN QM7 Confusion Chart");
     
     % Save model
     save("models/gcn_"+string(seed)+".mat", "accuracy", "parameters", "muX", "sigsqX", "best_val");
@@ -234,11 +206,9 @@ function [adjacency,features,labels] = preprocessData(adjacencyData,coulombData,
     atomicNumbers = unique(labels);
     atomNames =  atomicSymbol(atomicNumbers);
     labels = categorical(labels, atomicNumbers, atomNames);
-
 end
 
 function [adjacency,features] = preprocessPredictors(adjacencyData,coulombData)
-
     adjacency = sparse([]);
     features = [];
     
