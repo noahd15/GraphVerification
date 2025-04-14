@@ -49,8 +49,7 @@ atomDataTest = atomData(idxTest,:);
 
 % normalize training data
 muX = mean(XTrain);
-sigsqX = var(XTrain,1);
-
+sigsqX = var(XTrain,1); 
 XTrain = (XTrain - muX)./sqrt(sigsqX);
 XValidation = (XValidation - muX)./sqrt(sigsqX);
 % Create neural network model
@@ -234,8 +233,9 @@ function Y = model(parameters,X,A)
     ANorm = normalizeAdjacency(A);
     
     Z1 = X;
-    
+    whos Z1
     Z2 = ANorm * Z1 * parameters.mult1.Weights;
+    whos Z2
     Z2 = relu(Z2) + Z1;
     % Z2 = relu(Z2);
     

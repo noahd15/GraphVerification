@@ -1,28 +1,13 @@
-function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest, batchSize)
+function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest)
     % Verification of a Graph Neural Network
     
-    % Add default batch size if not provided
-    if nargin < 6
-        batchSize = 512; % Default batch size
-    end
-    
     % Load parameters of gcn
-    data = load(modelPath);
-    disp(data); % Check the contents of the loaded file
- 
-    % Ensure required variables are loaded
-    if isfield(data, 'muX') && isfield(data, 'sigsqX') && isfield(data, 'parameters')
-        muX = data.muX;
-        sigsqX = data.sigsqX;
-        parameters = data.parameters;
-    else
-        error("The loaded file does not contain 'muX', 'sigsqX', or 'parameters'.");
-    end
+    load("models/"+modelPath+".mat");
     
-    w1 = gather(parameters.mult1.Weights); % Ensure this field exists
+    w1 = gather(parameters.mult1.Weights);
     w2 = gather(parameters.mult2.Weights);
     w3 = gather(parameters.mult3.Weights);
-    
+
     
     % Start for loop for verification here, preprocess one molecule at a time
     
@@ -40,34 +25,28 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
     
         for i = 1:N
 
-            % [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,N),featureDataTest(:,:,N),labelDataTest(N,:));
-
-            for i = 1:N
-                [ATest, XTest, labelsTest] = preprocessData(adjacencyDataTest(:,:,i), featureDataTest(:,:,i), labelDataTest(i,:) );
-            end
-
+            % Get molecule data
+            [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,i),featureDataTest(:,:,i),labelDataTest(i,:));
             
             % normalize data
-            XTest = (XTest - muX)./sqrt(sigsqX);
+            % XTest = (XTest - muX)./sqrt(sigsqX);
             XTest = dlarray(XTest);
-      
             % adjacency matrix represent connections, so keep it as is
             Averify = normalizeAdjacency(ATest);
             
             % Get input set: input values for each node is X
             lb = extractdata(XTest-epsilon(k));
             ub = extractdata(XTest+epsilon(k));
+        
             Xverify = ImageStar(lb,ub);
-            fprintf('Size of Xverify %s\n', mat2str(size(Xverify.V)));
-            
+
             % Compute reachability
             t = tic;
             
             reachMethod = 'approx-star';
             L = ReluLayer(); % Create relu layer;
-
-            % Pass batch size to computeReachability
-            Y = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, full(Averify), batchSize);
+            
+            Y = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, Averify);
 
             % store results
             outputSets{i} = Y;
@@ -80,50 +59,57 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
         save("results/verified_nodes_"+modelPath+"_eps"+string(epsilon(k))+".mat", "outputSets", "targets", "rT");
     
     end
-
 end
 
 % Helper functions
 
-function [adjacency,features,labels] = preprocessData(adjacencyData,featureData,labelData)
-
-    [adjacency, features] = preprocessPredictors(adjacencyData,featureData);
+function [adjacency, features, labels] = preprocessData(adjacencyData, featureData, labelData)
+    % this loads in the cached file so we don't have to wait on predictors each time
+    % projectRoot = getenv('AV_PROJECT_HOME');
+    % cacheFile = fullfile(projectRoot, 'data', cacheFileName);
+    % if exist(cacheFile, 'file')
+    %     disp(['Loading cached ', cacheFileName, '...']);
+    %     load(cacheFile, 'adjacency', 'features');
+    % else
+    %     disp([cacheFileName,' not found. Running preprocessPredictors...']);
+    %     [adjacency, features] = preprocessPredictors(adjacencyData, featureData);
+    %     save(cacheFile, 'adjacency', 'features', '-v7.3');
+    % end
+    [adjacency, features] = preprocessPredictors(adjacencyData, featureData);
     labels = [];
-    
-    % Convert labels to categorical.
-    for i = 1:size(adjacencyData,3)
-        % Extract and append unpadded data.
-        T = nonzeros(labelData(i,:));
-        labels = [labels; T];
-    end
-    
-    labels2 = nonzeros(labelData);
-    assert(isequal(labels2,labels2))
-    
-    atomicNumbers = unique(labels);
-    atomNames =  atomicSymbol(atomicNumbers);
-    labels = categorical(labels, atomicNumbers, atomNames);
-
-end
- 
-function [adjacency,features] = preprocessPredictors(adjacencyData,featureData)
-
-    adjacency = sparse([]);
-    features = [];
-    
     for i = 1:size(adjacencyData, 3)
         numNodes = find(any(adjacencyData(:,:,i)), 1, "last");
-        if isempty(numNodes) || numNodes == 0
-            % Fallback to full size if no nonzero rows found.
-            numNodes = size(adjacencyData(:,:,i),1);
+        if isempty(numNodes)
+            numNodes = 0;
         end
-        A = adjacencyData(1:numNodes,1:numNodes,i);
-        X = featureData(1:numNodes,1:numNodes,i);
-        X = diag(X);
-        adjacency = blkdiag(adjacency, A);
-        features = [features; X];
+        T = labelData(i, 1:numNodes);
+        labels = [labels; T(:)];  
     end
+end
 
+function [adjacency, features] = preprocessPredictors(adjacencyData, featureData)
+    adjacency = sparse([]);
+    features = [];
+
+    for i = 1:size(adjacencyData, 3)
+        % Number of actual nodes
+        numNodes = find(any(adjacencyData(:,:,i)), 1, "last");
+        if isempty(numNodes) || numNodes==0
+            continue
+        end
+
+        A = adjacencyData(1:numNodes, 1:numNodes, i);
+        X = featureData(1:numNodes, :, i);
+
+        adjacency = blkdiag(adjacency, A);
+
+        % Concatenate feature rows
+        features = [features; X];
+
+        if mod(i, 500) == 0
+            fprintf('Processing graph %d\n', i);
+        end
+    end
 end
 
 function ANorm = normalizeAdjacency(A)
@@ -138,71 +124,37 @@ function ANorm = normalizeAdjacency(A)
     % Normalize adjacency matrix.
     ANorm = diag(degreeInvSqrt) * A * diag(degreeInvSqrt);
 
-    % Convert to a full matrix to avoid the sparse-input error:
-    ANorm = full(ANorm);
-
 end
 
-function Y = computeReachability(weights, L, reachMethod, input, adjMat, batchSize)
+function Y = computeReachability(weights, L, reachMethod, input, adjMat)
+    % weights = weights of GNN ({w1, w2, w3}
+    % L = Layer type (ReLU)
+    % reachMethod = reachability method for all layers('approx-star is default)
+    % input = pertubed input features (ImageStar)
+    % adjMat = adjacency matric of corresonding input features
+    % Y = computed output of GNN (ImageStar)
+
     Xverify = input;
-    Averify = adjMat;
-    n = size(adjMat,1);
-   
+    Averify = adjMat; %18 x 18
+    n = size(adjMat,1); %18
+    
     %%%%%%%%  LAYER 1  %%%%%%%%
-    
+
     % part 1
-    newV = Xverify.V;
-    disp("Size of input tensor: " + mat2str(size(newV)));
-    
-    % Get dimensions from the actual data
-    [inputRows, inputCols] = size(newV);
-    fprintf("Input dimensions: [%d, %d]\n", inputRows, inputCols);
-    
-    % Process in batches to avoid memory issues
-    resultV = [];
-    numBatches = ceil(inputCols / batchSize);
-    
-    for b = 1:numBatches
-        startIdx = (b-1)*batchSize + 1;
-        endIdx = min(b*batchSize, inputCols);
-        fprintf("Processing batch %d/%d (columns %d to %d)\n", b, numBatches, startIdx, endIdx);
-        
-        % Extract batch
-        batchV = newV(:, startIdx:endIdx);
-        
-        % Process batch
-        batchResult = Averify * batchV;
-        batchResult = tensorprod(batchResult, extractdata(weights{1}));
-        
-        % Collect results
-        if isempty(resultV)
-            resultV = batchResult;
-        else
-            resultV = cat(2, resultV, batchResult);
-        end
-    end
-    
-    % Final transformation
-    resultV = permute(resultV, [1 4 3 2]);
-    X2 = ImageStar(resultV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
-    
+    newV = Xverify.V; %18 x 110 x 1 x 1981
+    newV = squeeze(Xverify.V); % 18 x 110 x 1981
+    Averify_full = full(Averify);
+    newV = tensorprod(Averify_full, newV, 2, 1);
+    weights = extractdata(weights{1});
+    whos newV
+    whos weights
+    newV = tensorprod(newV, weights, 2, 1);
+    whos newV
+    newV = permute(newV, [1 4 3 2]);
+    X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
     % part 2
     X2b = L.reach(X2, reachMethod);
-    
-    % Process replication in batches if needed
-    if prod(size(Xverify.V)) > 1e7 % Threshold for batch processing
-        repV = [];
-        for b = 1:numBatches
-            startIdx = (b-1)*batchSize + 1;
-            endIdx = min(b*batchSize, size(Xverify.V,2));
-            batchV = Xverify.V(:, startIdx:endIdx);
-            batchRepV = repmat(batchV, [1, 32, 1, 1]);
-            repV = cat(2, repV, batchRepV);
-        end
-    else
-        repV = repmat(Xverify.V, [1, 32, 1, 1]);
-    end
-    
+    repV = repmat(Xverify.V,[1,32,1,1]);
     Xrep = ImageStar(repV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
     X2b_ = X2b.MinkowskiSum(Xrep);
     
@@ -228,4 +180,18 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat, batchSi
 
 end
 
-
+function sym = labelSymbol(labelNumbers)
+    sym = strings(size(labelNumbers));
+    for k = 1:numel(labelNumbers)
+        switch labelNumbers(k)
+            case 1
+                sym(k) = "Not Compromised";
+            case 2
+                sym(k) = "Compromised";
+            case 3
+                sym(k) = "Highly Compromised";
+            otherwise
+                error("Invalid label number: %g. Supported labels are 0,1,2,3.", labelNumbers(k));
+        end
+    end
+end

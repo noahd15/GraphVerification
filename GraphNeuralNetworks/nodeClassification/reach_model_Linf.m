@@ -1,35 +1,36 @@
 function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, coulombDataTest, atomDataTest)
     % Verification of a Graph Neural Network
     
-    % Load parameters of gcn
-    load("/Users/kendragivens/Documents/jupyter/Verification/AV_Project/GraphNeuralNetworks/nodeClassification/models/"+modelPath+".mat");
+    %% Load parameters of gcn
+    load("models/"+modelPath+".mat");
     
     w1 = gather(parameters.mult1.Weights);
     w2 = gather(parameters.mult2.Weights);
     w3 = gather(parameters.mult3.Weights);
+
     
-    % Start for loop for verification here, preprocess one molecule at a time
+    %% Start for loop for verification here, preprocess one molecule at a time
     
     N = size(coulombDataTest, 3);
-    
     % L_inf size
     % epsilon = [0.005; 0.01; 0.02; 0.05];
-    
     % Store resuts
     targets = {};
     outputSets = {};
     rT = {};
     
+    whos adjacencyDataTest
+    whos coulombDataTest
     for k = 1:length(epsilon)
     
         for i = 1:N
 
             % Get molecule data
-            [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,N),coulombDataTest(:,:,N),atomDataTest(N,:));
-            
+            [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,i),coulombDataTest(:,:,i),atomDataTest(i,:));
+
             % normalize data
             XTest = (XTest - muX)./sqrt(sigsqX);
-            XTest = dlarray(XTest);
+            XTest = dlarray(XTest);     
                     
             % adjacency matrix represent connections, so keep it as is
             Averify = normalizeAdjacency(ATest);
@@ -37,8 +38,9 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, coulombDataTest
             % Get input set: input values for each node is X
             lb = extractdata(XTest-epsilon(k));
             ub = extractdata(XTest+epsilon(k));
+
             Xverify = ImageStar(lb,ub);
-            % fprintf('Size of Xverify %s\n', mat2str(size(Xverify.V)));
+            V = Xverify.V;
             
             % Compute reachability
             t = tic;
@@ -57,9 +59,7 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, coulombDataTest
         
         % Save verification results
         save("results/verified_nodes_"+modelPath+"_eps"+string(epsilon(k))+".mat", "outputSets", "targets", "rT");
-    
     end
-
 end
 
 %% Helper functions
@@ -134,11 +134,11 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     n = size(adjMat,1);
     
     %%%%%%%%  LAYER 1  %%%%%%%%
-    
     % part 1
-    newV = Xverify.V;
-    newV = reshape(newV, [n n+1]);
+    newV = Xverify.V; %19x1x1x20
+    newV = reshape(newV, [n n+1]); %19 x 20
     newV = Averify * newV;
+    w = extractdata(weights{1});
     newV = tensorprod(newV, extractdata(weights{1}));
     newV = permute(newV, [1 4 3 2]);
     X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
@@ -166,6 +166,7 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     newV = tensorprod(full(Averify), newV, 2, 1);
     newV = tensorprod(newV, extractdata(weights{3}), 2, 1);
     newV = permute(newV, [1 4 2 3]);
+    whos newV
     Y = ImageStar(newV, X3b_.C, X3b_.d, X3b_.pred_lb, X3b_.pred_ub);
 
 end

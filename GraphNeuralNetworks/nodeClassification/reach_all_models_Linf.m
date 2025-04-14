@@ -28,9 +28,6 @@ coulombData = double(permute(data.X, [2 3 1]));
 atomData = sort(data.Z,2,'descend');
 % convert data to adjacency form
 adjacencyData = coulomb2Adjacency(coulombData,atomData);
-disp("ADJ");
-disp(size(adjacencyData));
-
 % Partition data
 numObservations = size(adjacencyData,3);
 [~ , ~, idxTest] = trainingPartitions(numObservations,[0.8 0.1 0.1]);
@@ -39,10 +36,6 @@ numObservations = size(adjacencyData,3);
 adjacencyDataTest = adjacencyData(:,:,idxTest);
 coulombDataTest = coulombData(:,:,idxTest);
 atomDataTest = atomData(idxTest,:);
-
-disp("ADJ Test");
-disp(size(adjacencyDataTest));
-
 %% Verify models
 
 % Study Variables
