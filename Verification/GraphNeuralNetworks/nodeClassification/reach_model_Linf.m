@@ -32,7 +32,7 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
             t = tic;
 
             reachMethod = 'approx-star';
-            L = ReluLayer(); 
+            L = ReluLayer();
 
             Y = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, Averify);
 
@@ -42,8 +42,19 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
             rT{i} = toc(t);
 
         end
+        
+        % Display some basic verification results
+        disp(['Verification completed for epsilon = ' num2str(epsilon(k))]);
+        disp(['Number of test samples processed: ' num2str(length(outputSets))]);
 
-        save("results/verified_nodes_"+modelPath+"_eps"+string(epsilon(k))+".mat", "outputSets", "targets", "rT");
+        currentDir = pwd;
+        resultsDir = fullfile(currentDir, 'temp_results');
+        if ~exist(resultsDir, 'dir')
+            mkdir(resultsDir);
+        end
+        resultsFile = fullfile(resultsDir, ['verified_model_' num2str(k) '.mat']);
+        disp(['Saving results to: ' resultsFile]);
+        save(resultsFile, 'outputSets', 'targets', 'rT');
 
     end
 end
@@ -121,15 +132,16 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     Averify_full = full(Averify);
     newV = tensorprod(Averify_full, newV, 2, 1); % 18 x 16 x 289
     w = extractdata(weights{1}); % 16x32
-    newV = tensorprod(newV, extractdata(weights{1})); %18 x 289 x 16 x 32
-    size(newV)
-    newV = permute(newV, [1 4 3 2]);
-    X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
-    % part 2
-    X2b = L.reach(X2, reachMethod);
-    repV = repmat(Xverify.V,[1,32,1,1]);
+    newV = tensorprod(newV, extractdata(weights{1}), 2, 1); %18 x 289 x 32
+    newV = reshape(newV, [size(newV,1), size(newV,2), 1, size(newV,3)]); % 18 x 289 x 1 x 32
+    newV = permute(newV, [1 4 3 2]); % 18 x 32 x 1 x 289
+    X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub); % 18 x 32 x 1 x 289
+    % part 2 %
+    X2b = L.reach(X2, reachMethod); % 18 x 32 x 1 x 289
+    repV = repmat(Xverify.V,[1,2,1,1]); %18 x 32 x 1 x 289
     Xrep = ImageStar(repV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
     X2b_ = X2b.MinkowskiSum(Xrep);
+    % size(X2b_.V)
 
     %%%%%%%%  LAYER 2  %%%%%%%%
 

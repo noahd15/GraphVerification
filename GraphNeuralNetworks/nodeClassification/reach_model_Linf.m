@@ -140,16 +140,17 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     newV = Averify * newV; %19 x 20
     w = extractdata(weights{1}); %1x32
     newV = tensorprod(newV, extractdata(weights{1})); % 19x20x1x32
-    whos newV
     newV = permute(newV, [1 4 3 2]); % 20x32x1x19
-    % whos newV
     X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
-    % part 2
-    X2b = L.reach(X2, reachMethod);
-    repV = repmat(Xverify.V,[1,32,1,1]);
+    % part 2 % 19 x 32 x 1 x 20
+    % size(X2.V)
+    X2b = L.reach(X2, reachMethod); % 19 x 32 x 1 x 20
+
+    repV = repmat(Xverify.V,[1,32,1,1]); %19 x 32 x 1 x 20
+    whos repV
     Xrep = ImageStar(repV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
     X2b_ = X2b.MinkowskiSum(Xrep);
-    
+    size(X2b_.V)
     %%%%%%%%  LAYER 2  %%%%%%%%
     
     % part 1

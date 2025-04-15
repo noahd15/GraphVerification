@@ -8,7 +8,7 @@ data = load(dataFile);
 rng(0);
 
 adjacencyData = data.adjacencyData;
-featureData = data.featureData_reduced; 
+featureData = data.featureData_reduced;
 labelData = data.labelData;
 
 idxTest = data.idxTest;
@@ -27,12 +27,19 @@ fprintf('Feature dimension: %d\n', size(featureDataTest, 2));
 seeds = 1; % models
 epsilon = 0.005; % attack
 
-% Verify one model at a time
-parfor k = 1:length(seeds)
+% Verify one model at a time - using regular for loop instead of parfor to avoid file access issues
+for k = 1:length(seeds)
     % Construct the model path
     modelPath = "node_gcn_" + string(seeds(k));
 
+    fprintf('Verifying model %s with epsilon %.4f\n', modelPath, epsilon);
+
     % Verify the model
-    reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest);
+    try
+        reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest);
+        fprintf('Successfully verified model %s\n', modelPath);
+    catch ME
+        fprintf('Error verifying model %s: %s\n', modelPath, ME.message);
+    end
 end
 
