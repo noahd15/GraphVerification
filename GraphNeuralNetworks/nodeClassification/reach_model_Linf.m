@@ -137,10 +137,12 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     % part 1
     newV = Xverify.V; %19x1x1x20
     newV = reshape(newV, [n n+1]); %19 x 20
-    newV = Averify * newV;
-    w = extractdata(weights{1});
-    newV = tensorprod(newV, extractdata(weights{1}));
-    newV = permute(newV, [1 4 3 2]);
+    newV = Averify * newV; %19 x 20
+    w = extractdata(weights{1}); %1x32
+    newV = tensorprod(newV, extractdata(weights{1})); % 19x20x1x32
+    whos newV
+    newV = permute(newV, [1 4 3 2]); % 20x32x1x19
+    % whos newV
     X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
     % part 2
     X2b = L.reach(X2, reachMethod);
@@ -166,7 +168,6 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     newV = tensorprod(full(Averify), newV, 2, 1);
     newV = tensorprod(newV, extractdata(weights{3}), 2, 1);
     newV = permute(newV, [1 4 2 3]);
-    whos newV
     Y = ImageStar(newV, X3b_.C, X3b_.d, X3b_.pred_lb, X3b_.pred_ub);
 
 end

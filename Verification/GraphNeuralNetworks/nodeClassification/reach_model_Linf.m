@@ -1,70 +1,54 @@
 function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest)
     % Verification of a Graph Neural Network
-    
-    % Load parameters of gcn
+
     load("models/"+modelPath+".mat");
-    
+
     w1 = gather(parameters.mult1.Weights);
     w2 = gather(parameters.mult2.Weights);
     w3 = gather(parameters.mult3.Weights);
 
-    
-    % Start for loop for verification here, preprocess one molecule at a time
-    
+
     N = size(featureDataTest, 3);
-    
     % L_inf size
     % epsilon = [0.005; 0.01; 0.02; 0.05];
-    
-    % Store resuts
     targets = {};
     outputSets = {};
     rT = {};
-    
+
     for k = 1:length(epsilon)
-    
+
         for i = 1:N
 
-            % Get molecule data
             [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,i),featureDataTest(:,:,i),labelDataTest(i,:));
-            
-            % normalize data
-            % XTest = (XTest - muX)./sqrt(sigsqX);
+
             XTest = dlarray(XTest);
-            % adjacency matrix represent connections, so keep it as is
             Averify = normalizeAdjacency(ATest);
-            
-            % Get input set: input values for each node is X
+
             lb = extractdata(XTest-epsilon(k));
             ub = extractdata(XTest+epsilon(k));
-        
+
             Xverify = ImageStar(lb,ub);
 
-            % Compute reachability
             t = tic;
-            
+
             reachMethod = 'approx-star';
-            L = ReluLayer(); % Create relu layer;
-            
+            L = ReluLayer(); 
+
             Y = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, Averify);
 
             % store results
             outputSets{i} = Y;
             targets{i} = labelsTest;
             rT{i} = toc(t);
-        
+
         end
-        
-        % Save verification results
+
         save("results/verified_nodes_"+modelPath+"_eps"+string(epsilon(k))+".mat", "outputSets", "targets", "rT");
-    
+
     end
 end
 
-% Helper functions
-
 function [adjacency, features, labels] = preprocessData(adjacencyData, featureData, labelData)
-    % this loads in the cached file so we don't have to wait on predictors each time
     % projectRoot = getenv('AV_PROJECT_HOME');
     % cacheFile = fullfile(projectRoot, 'data', cacheFileName);
     % if exist(cacheFile, 'file')
@@ -72,10 +56,9 @@ function [adjacency, features, labels] = preprocessData(adjacencyData, featureDa
     %     load(cacheFile, 'adjacency', 'features');
     % else
     %     disp([cacheFileName,' not found. Running preprocessPredictors...']);
-    %     [adjacency, features] = preprocessPredictors(adjacencyData, featureData);
-    %     save(cacheFile, 'adjacency', 'features', '-v7.3');
-    % end
     [adjacency, features] = preprocessPredictors(adjacencyData, featureData);
+        % save(cacheFile, 'adjacency', 'features', '-v7.3');
+    % end
     labels = [];
     for i = 1:size(adjacencyData, 3)
         numNodes = find(any(adjacencyData(:,:,i)), 1, "last");
@@ -83,7 +66,7 @@ function [adjacency, features, labels] = preprocessData(adjacencyData, featureDa
             numNodes = 0;
         end
         T = labelData(i, 1:numNodes);
-        labels = [labels; T(:)];  
+        labels = [labels; T(:)];
     end
 end
 
@@ -92,7 +75,6 @@ function [adjacency, features] = preprocessPredictors(adjacencyData, featureData
     features = [];
 
     for i = 1:size(adjacencyData, 3)
-        % Number of actual nodes
         numNodes = find(any(adjacencyData(:,:,i)), 1, "last");
         if isempty(numNodes) || numNodes==0
             continue
@@ -116,40 +98,31 @@ function ANorm = normalizeAdjacency(A)
 
     % Add self connections to adjacency matrix.
     A = A + speye(size(A));
-    
+
     % Compute inverse square root of degree.
     degree = sum(A, 2);
     degreeInvSqrt = sparse(sqrt(1./degree));
-    
+
     % Normalize adjacency matrix.
     ANorm = diag(degreeInvSqrt) * A * diag(degreeInvSqrt);
 
 end
 
 function Y = computeReachability(weights, L, reachMethod, input, adjMat)
-    % weights = weights of GNN ({w1, w2, w3}
-    % L = Layer type (ReLU)
-    % reachMethod = reachability method for all layers('approx-star is default)
-    % input = pertubed input features (ImageStar)
-    % adjMat = adjacency matric of corresonding input features
-    % Y = computed output of GNN (ImageStar)
-
     Xverify = input;
     Averify = adjMat; %18 x 18
     n = size(adjMat,1); %18
-    
+
     %%%%%%%%  LAYER 1  %%%%%%%%
 
     % part 1
-    newV = Xverify.V; %18 x 110 x 1 x 1981
-    newV = squeeze(Xverify.V); % 18 x 110 x 1981
+    newV = Xverify.V; %18 x 16 x 1 x 289
+    newV = squeeze(Xverify.V); % 18 x 16 x 289
     Averify_full = full(Averify);
-    newV = tensorprod(Averify_full, newV, 2, 1);
-    weights = extractdata(weights{1});
-    whos newV
-    whos weights
-    newV = tensorprod(newV, weights, 2, 1);
-    whos newV
+    newV = tensorprod(Averify_full, newV, 2, 1); % 18 x 16 x 289
+    w = extractdata(weights{1}); % 16x32
+    newV = tensorprod(newV, extractdata(weights{1})); %18 x 289 x 16 x 32
+    size(newV)
     newV = permute(newV, [1 4 3 2]);
     X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
     % part 2
@@ -157,9 +130,9 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     repV = repmat(Xverify.V,[1,32,1,1]);
     Xrep = ImageStar(repV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
     X2b_ = X2b.MinkowskiSum(Xrep);
-    
+
     %%%%%%%%  LAYER 2  %%%%%%%%
-    
+
     % part 1
     newV = X2b_.V;
     newV = tensorprod(full(Averify), newV, 2, 1);
@@ -167,11 +140,11 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     newV = permute(newV, [1 4 2 3]);
     X3 = ImageStar(newV, X2b_.C, X2b_.d, X2b_.pred_lb, X2b_.pred_ub);
     % part 2
-    X3b = L.reach(X3, reachMethod); 
+    X3b = L.reach(X3, reachMethod);
     X3b_ = X3b.MinkowskiSum(X2b_);
-    
+
     %%%%%%%%  LAYER 3  %%%%%%%%
-    
+
     newV = X3b_.V;
     newV = tensorprod(full(Averify), newV, 2, 1);
     newV = tensorprod(newV, extractdata(weights{3}), 2, 1);

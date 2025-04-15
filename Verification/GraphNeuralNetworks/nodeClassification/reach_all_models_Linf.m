@@ -3,29 +3,29 @@ projectRoot = getenv('AV_PROJECT_HOME');
 addpath(genpath(fullfile(projectRoot, '/Verification/GraphNeuralNetworks/nodeClassification/functions/')))
 addpath(genpath(fullfile(projectRoot, '/Verification/GraphNeuralNetworks/nodeClassification/models/')))
 
-% Load data
-dataFile = fullfile(projectRoot, 'data', 'node.mat');
-data = load(dataFile);rng(0); 
+dataFile = fullfile(projectRoot, 'data', 'reducedDatasetNode.mat');
+data = load(dataFile);
+rng(0);
 
-% Convert edge indices to adjacency matrices
-adjacencyData = edges2Adjacency(data);
-featureData = data.features;
-labelData = double(permute(data.labels, [2 1]));
+adjacencyData = data.adjacencyData;
+featureData = data.featureData_reduced; 
+labelData = data.labelData;
 
-% Partition data
-numObservations = size(adjacencyData, 3);
-[idxTrain, idxVal, idxTest] = trainingPartitions(numObservations,[0.8 0.1 0.1]);
+idxTest = data.idxTest;
 
 adjacencyDataTest = adjacencyData(:,:,idxTest);
 featureDataTest = featureData(:,:,idxTest);
-atomDataTest = labelData(idxTest,:);
+labelDataTest = labelData(idxTest,:);
+
+fprintf('Number of test samples: %d\n', length(idxTest));
+fprintf('Feature dimension: %d\n', size(featureDataTest, 2));
 
 %% Verify models
 
 % Study Variables
 % seeds = [0,1,2,3,4]; % models
-seeds = [1]; % models
-epsilon = [0.005]% , 0.01, 0.02, 0.05]; % attack
+seeds = 1; % models
+epsilon = 0.005; % attack
 
 % Verify one model at a time
 parfor k = 1:length(seeds)
