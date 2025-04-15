@@ -24,8 +24,8 @@ fprintf('Feature dimension: %d\n', size(featureDataTest, 2));
 
 % Study Variables
 % seeds = [0,1,2,3,4]; % models
-seeds = 1; % models
-epsilon = 0.005; % attack
+seeds = [1]; % models
+epsilon = [0.005]; % attack
 
 % Verify one model at a time - using regular for loop instead of parfor to avoid file access issues
 for k = 1:length(seeds)
@@ -34,12 +34,6 @@ for k = 1:length(seeds)
 
     fprintf('Verifying model %s with epsilon %.4f\n', modelPath, epsilon);
 
-    % Verify the model
-    try
-        reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest);
-        fprintf('Successfully verified model %s\n', modelPath);
-    catch ME
-        fprintf('Error verifying model %s: %s\n', modelPath, ME.message);
-    end
+    reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest);
 end
 

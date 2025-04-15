@@ -6,7 +6,8 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
     w1 = gather(parameters.mult1.Weights);
     w2 = gather(parameters.mult2.Weights);
     w3 = gather(parameters.mult3.Weights);
-
+    % fc_w = gather(parameters.fc.Weights);
+    % fc_b = gather(parameters.fc.Bias);
 
     N = size(featureDataTest, 3);
     % L_inf size
@@ -40,36 +41,20 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
             outputSets{i} = Y;
             targets{i} = labelsTest;
             rT{i} = toc(t);
+        end
 
+        if ~exist('results', 'dir')
+            mkdir('results');
         end
         
-        % Display some basic verification results
-        disp(['Verification completed for epsilon = ' num2str(epsilon(k))]);
-        disp(['Number of test samples processed: ' num2str(length(outputSets))]);
-
-        currentDir = pwd;
-        resultsDir = fullfile(currentDir, 'temp_results');
-        if ~exist(resultsDir, 'dir')
-            mkdir(resultsDir);
-        end
-        resultsFile = fullfile(resultsDir, ['verified_model_' num2str(k) '.mat']);
-        disp(['Saving results to: ' resultsFile]);
-        save(resultsFile, 'outputSets', 'targets', 'rT');
+        save("results/verified_nodes_"+modelPath+"_eps"+string(epsilon(k))+".mat", "outputSets", "targets", "rT", '-v7.3');
+        disp("SAVED")
 
     end
 end
 
 function [adjacency, features, labels] = preprocessData(adjacencyData, featureData, labelData)
-    % projectRoot = getenv('AV_PROJECT_HOME');
-    % cacheFile = fullfile(projectRoot, 'data', cacheFileName);
-    % if exist(cacheFile, 'file')
-    %     disp(['Loading cached ', cacheFileName, '...']);
-    %     load(cacheFile, 'adjacency', 'features');
-    % else
-    %     disp([cacheFileName,' not found. Running preprocessPredictors...']);
     [adjacency, features] = preprocessPredictors(adjacencyData, featureData);
-        % save(cacheFile, 'adjacency', 'features', '-v7.3');
-    % end
     labels = [];
     for i = 1:size(adjacencyData, 3)
         numNodes = find(any(adjacencyData(:,:,i)), 1, "last");
@@ -162,6 +147,18 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     newV = tensorprod(newV, extractdata(weights{3}), 2, 1);
     newV = permute(newV, [1 4 2 3]);
     Y = ImageStar(newV, X3b_.C, X3b_.d, X3b_.pred_lb, X3b_.pred_ub);
+
+     %%%%%%%%  LAYER 4  %%%%%%%%
+    % numNodes = size(Y_conv.V,1);
+    % Y_nodes = cell(numNodes,1);
+
+    % for nodeIdx = 1:numNodes
+    %     Y_node = Y_conv.slice(1, nodeIdx);  
+    %     Y_final_node = Y_node.affineMap(w1, w2);  
+    %     Y_nodes{nodeIdx} = Y_final_node;
+    % end
+    % Y = Y_nodes;
+
 
 end
 

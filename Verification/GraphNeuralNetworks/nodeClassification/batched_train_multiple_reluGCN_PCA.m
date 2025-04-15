@@ -65,14 +65,14 @@ for i = 1:length(seeds)
     sz = [numHiddenFeatureMaps, numHiddenFeatureMaps];
     parameters.mult2.Weights = dlarray(initializeGlorot(sz, numHiddenFeatureMaps, numHiddenFeatureMaps, "double"));
 
-    % Layer 3 - Third Graph Convolution
-    sz = [numHiddenFeatureMaps, numHiddenFeatureMaps];
-    parameters.mult3.Weights = dlarray(initializeGlorot(sz, numHiddenFeatureMaps, numHiddenFeatureMaps, "double"));
-
-    % Layer 4 - Final Linear Layer
+    % Layer 3 - Third Graph Convolution (outputs directly to numClasses)
     sz = [numHiddenFeatureMaps, numClasses];
-    parameters.fc.Weights = dlarray(initializeGlorot(sz, numClasses, numHiddenFeatureMaps, "double"));
-    parameters.fc.Bias = dlarray(zeros(1, numClasses, "double"));
+    parameters.mult3.Weights = dlarray(initializeGlorot(sz, numClasses, numHiddenFeatureMaps, "double"));
+
+    % % Layer 4 - Final Linear Layer (not used in this version)
+    % sz = [numHiddenFeatureMaps, numClasses];
+    % parameters.fc.Weights = dlarray(initializeGlorot(sz, numClasses, numHiddenFeatureMaps, "double"));
+    % parameters.fc.Bias = dlarray(zeros(1, numClasses, "double"));
 
     %% Training Setup
     numEpochs = 200;
@@ -328,8 +328,10 @@ function Y = model(parameters, X, A)
     conv2 = ANorm * relu1 * parameters.mult2.Weights;
     relu2 = relu(conv2);
     conv3 = ANorm * relu2 * parameters.mult3.Weights;
-    lin1 = conv3 * parameters.fc.Weights + parameters.fc.Bias;
-    Y = softmax(lin1, DataFormat="BC");
+    Y = softmax(conv3, DataFormat="BC");
+
+    % lin1 = conv3 * parameters.fc.Weights + parameters.fc.Bias;
+    % Y = softmax(lin1, DataFormat="BC");
 
 end
 
@@ -340,8 +342,8 @@ function [loss, gradients] = modelLoss(parameters, X, A, T, classWeights)
         parameters.mult1.Weights = dlarray(parameters.mult1.Weights);
         parameters.mult2.Weights = dlarray(parameters.mult2.Weights);
         parameters.mult3.Weights = dlarray(parameters.mult3.Weights);
-        parameters.fc.Weights = dlarray(parameters.fc.Weights);
-        parameters.fc.Bias = dlarray(parameters.fc.Bias);
+        % parameters.fc.Weights = dlarray(parameters.fc.Weights);
+        % parameters.fc.Bias = dlarray(parameters.fc.Bias);
     end
 
     % Forward pass through the model

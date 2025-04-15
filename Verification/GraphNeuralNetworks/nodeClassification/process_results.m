@@ -7,22 +7,22 @@
 %% Process results for each model independently
 
 % seeds = [0,1,2,3,4]; % models
-seeds = [5,6,7,8,9]; % models
-epsilon = [0.005; 0.01; 0.02; 0.05];
+seeds = [1]; % models
+epsilon = [0.005] %; 0.01; 0.02; 0.05];
 eN = length(epsilon);
 
 % Verify one model at a time
 for m=1:length(seeds)
 
     % get model
-    modelPath = "gcn_"+string(seeds(m));
+    modelPath = "node_gcn_"+string(seeds(m));
     
     % initialize vars
     samples = zeros(eN,4);
 
     for k = 1:eN
         % Load data one at a time
-        load("results/my_custom_results_"+modelPath+"_eps"+string(epsilon(k))+".mat"); % adapt to your files
+        load("results/verified_nodes_"+modelPath+"_eps"+string(epsilon(k))+".mat"); % adapt to your files
 
         N = length(targets);
         for i=1:N
@@ -47,13 +47,13 @@ for m=1:length(seeds)
     
     % Create table with these values
     fileID = fopen("results/summay_results_"+modelPath+".txt",'w');
-    fprintf(fileID, 'Summary of the model with accuracy = %.4f\n', model.accuracy);
+    fprintf(fileID, 'Summary of the model with accuracy = %.4f\n', "");
     fprintf(fileID,'                 ATOMS \n');
     fprintf(fileID, 'Epsilon | Robust  Unknown  Not Rob.  N \n');
     fprintf(fileID, '  0.005 | %.3f    %.3f   %.3f   %d \n', samples(1,1)/samples(1,4), samples(1,2)/samples(1,4), samples(1,3)/samples(1,4), samples(1,4));
-    fprintf(fileID, '   0.01 | %.3f    %.3f   %.3f   %d \n', samples(2,1)/samples(2,4), samples(2,2)/samples(2,4), samples(2,3)/samples(2,4), samples(2,4));
-    fprintf(fileID, '   0.02 | %.3f    %.3f   %.3f   %d \n', samples(3,1)/samples(3,4), samples(3,2)/samples(3,4), samples(3,3)/samples(3,4), samples(3,4));
-    fprintf(fileID, '   0.05 | %.3f    %.3f   %.3f   %d \n', samples(4,1)/samples(4,4), samples(4,2)/samples(4,4), samples(4,3)/samples(4,4), samples(4,4));
+    % fprintf(fileID, '   0.01 | %.3f    %.3f   %.3f   %d \n', samples(2,1)/samples(2,4), samples(2,2)/samples(2,4), samples(2,3)/samples(2,4), samples(2,4));
+    % fprintf(fileID, '   0.02 | %.3f    %.3f   %.3f   %d \n', samples(3,1)/samples(3,4), samples(3,2)/samples(3,4), samples(3,3)/samples(3,4), samples(3,4));
+    % fprintf(fileID, '   0.05 | %.3f    %.3f   %.3f   %d \n', samples(4,1)/samples(4,4), samples(4,2)/samples(4,4), samples(4,3)/samples(4,4), samples(4,4));
     fclose(fileID);
 
 end

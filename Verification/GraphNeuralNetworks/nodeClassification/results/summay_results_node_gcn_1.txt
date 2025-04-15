@@ -1,0 +1,4 @@
+Summary of the model with accuracy = NaN
+                 ATOMS 
+Epsilon | Robust  Unknown  Not Rob.  N 
+  0.005 | 0.670    0.006   0.324   35947 

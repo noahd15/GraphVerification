@@ -1,10 +1,8 @@
 %% Verify the robustness reach sets of all models
-addpath(genpath('C:\Users\Noah\OneDrive - Vanderbilt\Spring 2025\CS 6315\Project\AV_Project\GraphNeuralNetworks\nodeClassification'));
-addpath(genpath('/Users/noah/nnv'))
 
-epsilon = [0.005; 0.01; 0.02; 0.05];
+epsilon = [0.005] %; 0.01; 0.02; 0.05];
 % seeds = [0,1,2,3,4];
-seeds = [5,6,7,8,9]; % models
+seeds = [1] %[5,6,7,8,9]; % models
 
 parfor m=1:length(seeds)
 
@@ -14,8 +12,7 @@ parfor m=1:length(seeds)
     for k = 1:length(epsilon)
     
         % Load data one at a time
-        rdata = load(fullfile('C:\Users\Noah\OneDrive - Vanderbilt\Spring 2025\CS 6315\Project\AV_Project\GraphNeuralNetworks\nodeClassification\results', ...
-    "verified_nodes_" + modelPath + "_eps" + string(epsilon(k)) + ".mat"));
+        rdata = load("results/verified_nodes_"+modelPath+"_eps"+string(epsilon(k))+".mat");
     
         % Check for robustness value (one molecule, 1 atom at a time)
         results = {};
@@ -118,4 +115,3 @@ end
 function parsave(modelPath, epsilon, results, outputSets, rT, targets)
     save("results/verified_nodes_"+modelPath+"_eps"+string(epsilon)+".mat", "results", "outputSets", "rT", "targets");
 end
-

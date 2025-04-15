@@ -1,11 +1,11 @@
 %% Verify the robustness reach sets of all models
 % Adjust epsilon and seeds as needed
-epsilon = [0.005; 0.01; 0.02; 0.05];
-seeds = [5];
+epsilon = [0.005] %; 0.01; 0.02; 0.05];
+seeds = [1];
 
 parfor m = 1:length(seeds)
 
-    modelPath = "gcn_" + string(seeds(m));
+    modelPath = "node_gcn_" + string(seeds(m));
     
     for k = 1:length(epsilon)
         % Load outputs (must match how you saved them)
@@ -39,7 +39,6 @@ function results = verifySample(X, target)
         end
         Y = X.affineMap(matIdx, []);
         Y = Y.toStar; 
-        disp(['Y dimension: ', num2str(Y.dim)]);
         sampleLabel = target(i,:);
         sampleHs = label2Hs(sampleLabel);
         res = verify_specification(Y, sampleHs);

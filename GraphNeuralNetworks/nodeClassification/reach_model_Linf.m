@@ -19,8 +19,6 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, coulombDataTest
     outputSets = {};
     rT = {};
     
-    whos adjacencyDataTest
-    whos coulombDataTest
     for k = 1:length(epsilon)
     
         for i = 1:N
@@ -147,10 +145,8 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     X2b = L.reach(X2, reachMethod); % 19 x 32 x 1 x 20
 
     repV = repmat(Xverify.V,[1,32,1,1]); %19 x 32 x 1 x 20
-    whos repV
     Xrep = ImageStar(repV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
     X2b_ = X2b.MinkowskiSum(Xrep);
-    size(X2b_.V)
     %%%%%%%%  LAYER 2  %%%%%%%%
     
     % part 1
