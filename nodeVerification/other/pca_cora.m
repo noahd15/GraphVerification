@@ -10,7 +10,7 @@ addpath(genpath(fullfile(projectRoot, '/nodeVerification/important/functions/'))
 addpath(genpath(fullfile(projectRoot, '/nodeVerification/important/models/')));
 
 %% Load original data
-dataFile = fullfile(projectRoot, 'data', 'node.mat');
+dataFile = fullfile(projectRoot, 'data', 'cora_node.mat');
 data = load(dataFile);
 
 disp(data);
@@ -27,14 +27,36 @@ labelData = labelData + 1;  % Adjust labels to start from 1 instead of 0
 num_classes = max(labelData);
 
 
-adjacencyData = edges2Adjacency(data);
+adjacencyData = edges2AdjacencyCORA(data);
 numObservations = size(adjacencyData, num_classes);
 
 %% Split data into train/validation/test sets
 rng(2024);  % For reproducibility
 
 
-[idxTrain, idxValidation, idxTest] = trainingPartitions(numObservations, [0.8 0.1 0.1]);
+
+% Since there is only one graph, partition by node rather than by graph.
+numNodes = size(featureData, 1); 
+rng(2024);  % For reproducibility
+[idxTrain, idxValidation, idxTest] = trainingPartitions(numNodes, [0.8 0.1 0.1]);
+
+% Create node-based subgraphs from adjacencyData
+adjTrain = adjacencyData(idxTrain, idxTrain, 1);
+adjVal   = adjacencyData(idxValidation, idxValidation, 1);
+adjTest  = adjacencyData(idxTest, idxTest, 1);
+
+% Slice features accordingly
+featuresTrain = featureData(idxTrain, :, 1);
+featuresVal   = featureData(idxValidation, :, 1);
+featuresTest  = featureData(idxTest, :, 1);
+
+% Now perform PCA, training only on the training subset
+nonZeroRowsTrain = any(featuresTrain, 2);
+Xtrain = featuresTrain(nonZeroRowsTrain, :);
+
+[coeff, ~, ~, ~, explained, mu] = pca(Xtrain);
+
+
 %% --- Perform PCA on the Training Data ---
 % Get dimensions
 [numNodes, numFeatures, numGraphs] = size(featureData);
@@ -44,15 +66,15 @@ desired_dim = 16;  % Target dimensionality after PCA
 featureData_reduced = zeros(numNodes, desired_dim, numGraphs);
 
 % Collect all non-zero node features for PCA training
-allFeatures = [];
-for i = 1:length(idxTrain)
-    graphIdx = idxTrain(i);
-    % Get features for this graph
-    graphFeatures = featureData(:, :, graphIdx);
-    % Only include non-zero rows (actual nodes)
-    nonZeroRows = any(graphFeatures, 2);
-    allFeatures = [allFeatures; graphFeatures(nonZeroRows, :)];
-end
+% allFeatures = [];
+% for i = 1:length(idxTrain)
+%     graphIdx = idxTrain(i);
+%     % Get features for this graph
+%     graphFeatures = featureData(:, :, graphIdx);
+%     % Only include non-zero rows (actual nodes)
+%     nonZeroRows = any(graphFeatures, 2);
+%     allFeatures = [allFeatures; graphFeatures(nonZeroRows, :)];
+% end
 
 % Perform PCA on the collected features
 fprintf('Performing PCA to reduce features from %d to %d dimensions...\n', numFeatures, desired_dim);
@@ -91,4 +113,4 @@ save(fullfile(projectRoot, 'data', 'reducedDatasetNode.mat'), 'coeff_reduced', '
     'featureData_reduced', 'adjacencyData', 'labelData', ...
     'idxTrain', 'idxValidation', 'idxTest', '-v7.3');
 
-fprintf('Reduced dataset saved to: %s\n', fullfile(projectRoot, 'data', 'reducedDatasetNode.mat'));
+fprintf('Reduced dataset saved to: %s\n', fullfile(projectRoot, 'data', 'reducedCORADatasetNode.mat'));

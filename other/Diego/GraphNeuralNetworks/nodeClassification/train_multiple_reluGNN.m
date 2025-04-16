@@ -17,6 +17,7 @@ end
 rng(2024); % set fix random seed for data
 
 data = load(dataFile);
+disp(data);
 % Extract the Coulomb data and the atomic numbers from the loaded structure. 
 % Permute the Coulomb data so that the third dimension corresponds to the observations. 
 coulombData = double(permute(data.X, [2 3 1]));
