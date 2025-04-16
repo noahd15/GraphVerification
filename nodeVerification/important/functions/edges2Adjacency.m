@@ -31,9 +31,10 @@ function adjacency_tensor = edges2Adjacency(dataset)
     
     % Preallocate the output 3D array.
     adjacency_tensor = zeros(num_nodes, num_nodes, num_graphs);
-    
+    disp(num_graphs);
     % Process each graph.
     for i = 1:num_graphs
+ %       fprintf('Edge indices shape: %s\n', dataset.edge_indices);
         edges = dataset.edge_indices(:, :, i);
 
         % Assume that the graph has fixed num_nodes.
