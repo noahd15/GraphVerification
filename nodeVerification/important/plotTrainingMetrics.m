@@ -65,12 +65,13 @@ end
 if ~isempty(val_accs)
     plot(epochs, val_accs, '-x', 'LineWidth', 1.5, 'DisplayName', 'Validation Accuracy');
 end
-if ~isempty(test_accs) && any(~isnan(test_accs))
-    plot(epochs, test_accs, '-s', 'LineWidth', 1.5, 'DisplayName', 'Test Accuracy');
-end
+% Test accuracy is only shown in the final bar plot, not in the line charts
+% if ~isempty(test_accs) && any(~isnan(test_accs))
+%     plot(epochs, test_accs, '-s', 'LineWidth', 1.5, 'DisplayName', 'Test Accuracy');
+% end
 xlabel('Epoch', 'FontSize', 12);
 ylabel('Accuracy', 'FontSize', 12);
-title('Training, Validation, and Test Accuracy', 'FontSize', 14, 'FontWeight', 'bold');
+title('Training and Validation Accuracy', 'FontSize', 14, 'FontWeight', 'bold');
 legend('Location', 'best', 'FontSize', 10);
 grid on;
 saveas(gcf, fullfile(resultsDir, 'accuracy_curves.png'));
@@ -85,12 +86,13 @@ end
 if ~isempty(val_precision)
     plot(epochs, val_precision, '-x', 'LineWidth', 1.5, 'DisplayName', 'Validation Precision');
 end
-if ~isempty(test_precision) && any(~isnan(test_precision))
-    plot(epochs, test_precision, '-s', 'LineWidth', 1.5, 'DisplayName', 'Test Precision');
-end
+% Test precision is only shown in the final bar plot, not in the line charts
+% if ~isempty(test_precision) && any(~isnan(test_precision))
+%     plot(epochs, test_precision, '-s', 'LineWidth', 1.5, 'DisplayName', 'Test Precision');
+% end
 xlabel('Epoch', 'FontSize', 12);
 ylabel('Precision', 'FontSize', 12);
-title('Training, Validation, and Test Precision', 'FontSize', 14, 'FontWeight', 'bold');
+title('Training and Validation Precision', 'FontSize', 14, 'FontWeight', 'bold');
 legend('Location', 'best', 'FontSize', 10);
 grid on;
 saveas(gcf, fullfile(resultsDir, 'precision_curves.png'));
@@ -105,12 +107,13 @@ end
 if ~isempty(val_recall)
     plot(epochs, val_recall, '-x', 'LineWidth', 1.5, 'DisplayName', 'Validation Recall');
 end
-if ~isempty(test_recall) && any(~isnan(test_recall))
-    plot(epochs, test_recall, '-s', 'LineWidth', 1.5, 'DisplayName', 'Test Recall');
-end
+% Test recall is only shown in the final bar plot, not in the line charts
+% if ~isempty(test_recall) && any(~isnan(test_recall))
+%     plot(epochs, test_recall, '-s', 'LineWidth', 1.5, 'DisplayName', 'Test Recall');
+% end
 xlabel('Epoch', 'FontSize', 12);
 ylabel('Recall', 'FontSize', 12);
-title('Training, Validation, and Test Recall', 'FontSize', 14, 'FontWeight', 'bold');
+title('Training and Validation Recall', 'FontSize', 14, 'FontWeight', 'bold');
 legend('Location', 'best', 'FontSize', 10);
 grid on;
 saveas(gcf, fullfile(resultsDir, 'recall_curves.png'));
@@ -125,12 +128,13 @@ end
 if ~isempty(val_f1)
     plot(epochs, val_f1, '-x', 'LineWidth', 1.5, 'DisplayName', 'Validation F1 Score');
 end
-if ~isempty(test_f1) && any(~isnan(test_f1))
-    plot(epochs, test_f1, '-s', 'LineWidth', 1.5, 'DisplayName', 'Test F1 Score');
-end
+% Test F1 score is only shown in the final bar plot, not in the line charts
+% if ~isempty(test_f1) && any(~isnan(test_f1))
+%     plot(epochs, test_f1, '-s', 'LineWidth', 1.5, 'DisplayName', 'Test F1 Score');
+% end
 xlabel('Epoch', 'FontSize', 12);
 ylabel('F1 Score', 'FontSize', 12);
-title('Training, Validation, and Test F1 Score', 'FontSize', 14, 'FontWeight', 'bold');
+title('Training and Validation F1 Score', 'FontSize', 14, 'FontWeight', 'bold');
 legend('Location', 'best', 'FontSize', 10);
 grid on;
 saveas(gcf, fullfile(resultsDir, 'f1_curves.png'));

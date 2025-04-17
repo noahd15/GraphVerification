@@ -2,14 +2,30 @@ projectRoot = getenv('AV_PROJECT_HOME');
 
 addpath(genpath(fullfile(projectRoot, '/nodeVerification/functions/')));
 addpath(genpath(fullfile(projectRoot, '/nodeVerification/models/')));
-% addpath(genpath('/users/noahdahle/nnv'))
+
+% Load Cora dataset
+dataFile = fullfile(projectRoot, 'data', 'cora_node.mat');
+data = load(dataFile);
 
 % Full Cora graph
-A_full   = data.edge_indices(:,:,1);    % 2708×2708 sparse (possibly single)
-X_full   = data.features(:,:,1);        % 2708×featureDim
-y_full   = double(data.labels(:)) + 1;   % 2708×1, labels 1–7
+A_full = data.edge_indices(:,:,1);    % 2708×2708 sparse (possibly single)
+X_full = data.features(:,:,1);        % 2708×featureDim
+y_full = double(data.labels(:)) + 1;   % 2708×1, labels 1–7
 [numNodes, featureDim] = size(X_full);
 rng(2024);
+
+% Train/Val/Test node splits
+indices = randperm(numNodes);
+nTrain = round(0.8 * numNodes);
+nVal = round(0.1 * numNodes);
+idxTrain = indices(1:nTrain);
+idxValidation = indices(nTrain+1 : nTrain+nVal);
+idxTest = indices(nTrain+nVal+1 : end);
+
+% Prepare test data for verification
+adjacencyDataTest = A_full(idxTest, idxTest);
+featureDataTest = X_full(idxTest, :);
+labelDataTest = y_full(idxTest);
 
 %% Verify models
 
