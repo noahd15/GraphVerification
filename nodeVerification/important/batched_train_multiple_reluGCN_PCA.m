@@ -8,7 +8,7 @@ if isempty(projectRoot)
 end
 
 % Load in reduced data from PCA
-dataFile = fullfile(projectRoot, 'data', 'node.mat');
+dataFile = fullfile(projectRoot, 'data/reducedDatasetNode.mat');
 data = load(dataFile);
 
 disp(data);
@@ -17,6 +17,12 @@ disp(data);
 featureData = data.featureData_reduced; % Use the reduced features
 labelData = data.labelData;
 adjacencyData = data.adjacencyData;
+
+whos adjacencyData
+whos featureData
+whos labelData
+
+
 
 % Get the indices for train, validation, and test sets
 idxTrain = data.idxTrain;
