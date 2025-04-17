@@ -1,6 +1,6 @@
 % Cora GCN Training and Verification Demo
 % Updated to use full graph adjacency and node‑level splits
-
+setenv('AV_PROJECT_HOME',  'C:\Users\Noah\OneDrive - Vanderbilt\Spring 2025\CS 6315\Project\AV_Project'); 
 %% Setup
 canUseGPU = false;
 projectRoot = getenv('AV_PROJECT_HOME');
@@ -99,6 +99,26 @@ Yall = model(parameters, dlarray(X_full), A_full);
 [~, p_test] = max(extractdata(Yall(idxTest,:)),[],2);
 testAcc = mean(p_test == y_full(idxTest));
 fprintf("Test Accuracy: %.4f\n", testAcc);
+
+%% Plot Results
+figure;
+subplot(1,2,1);
+plot(1:numEpochs, train_losses, '-b', 'LineWidth', 1.5); hold on;
+plot(1:numEpochs, val_losses, '-r', 'LineWidth', 1.5);
+xlabel('Epoch');
+ylabel('Loss');
+legend('Train Loss', 'Validation Loss');
+title('Loss vs. Epoch');
+grid on;
+
+subplot(1,2,2);
+plot(1:numEpochs, train_accs, '-b', 'LineWidth', 1.5); hold on;
+plot(1:numEpochs, val_accs, '-r', 'LineWidth', 1.5);
+xlabel('Epoch');
+ylabel('Accuracy');
+legend('Train Accuracy', 'Validation Accuracy');
+title('Accuracy vs. Epoch');
+grid on;
 
 %% Helper Functions
 function [A_batch, X_batch, labels_batch] = createMiniBatch(A_full, X_full, y_full, batchIndices)
