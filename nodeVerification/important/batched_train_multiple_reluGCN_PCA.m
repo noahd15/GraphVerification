@@ -23,7 +23,6 @@ whos featureData
 whos labelData
 
 
-
 % Get the indices for train, validation, and test sets
 idxTrain = data.idxTrain;
 idxValidation = data.idxValidation;

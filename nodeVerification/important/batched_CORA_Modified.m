@@ -100,6 +100,8 @@ Yall = model(parameters, dlarray(X_full), A_full);
 testAcc = mean(p_test == y_full(idxTest));
 fprintf("Test Accuracy: %.4f\n", testAcc);
 
+save("models/cora_node_gcn_" + "0" + ".mat");
+
 %% Helper Functions
 function [A_batch, X_batch, labels_batch] = createMiniBatch(A_full, X_full, y_full, batchIndices)
     A_batch      = A_full(batchIndices, batchIndices);
