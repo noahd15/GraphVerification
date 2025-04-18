@@ -1,179 +1,112 @@
 function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest)
-    % Verification of a Graph Neural Network
+    % Verification of a full‐batch GCN on the Cora test subgraph
+    if nargin==0
+        % fall back to defaults if called with no args
+        projectRoot = getenv('AV_PROJECT_HOME');
+        data = load(fullfile(projectRoot,'data','cora_node.mat'));
+        A_full = data.edge_indices(:,:,1);
+        X_full = data.features(:,:,1);
+        y_full = double(data.labels(:)) + 1;
+        numNodes = size(X_full,1);
+        rng(2024);
+        [~,~,idxTest] = trainingPartitions(numNodes, [0.8 0.1 0.1]);
+        adjacencyDataTest = A_full(idxTest, idxTest);
+        featureDataTest   = X_full(idxTest, :);
+        labelDataTest     = y_full(idxTest);
+        modelPath = "cora_node_gcn_1";
+        epsilon   = 0.005;
+    end
 
-    load("models/"+modelPath+".mat");
+    % Load trained GCN parameters
+    S = load("models/"+modelPath+".mat","parameters");
+    params = S.parameters;
 
-    w1 = gather(parameters.mult1.Weights);
-    w2 = gather(parameters.mult2.Weights);
-    w3 = gather(parameters.mult3.Weights);
-    % fc_w = gather(parameters.fc.Weights);
-    % fc_b = gather(parameters.fc.Bias);
+    % Gather weights
+    W = { gather(params.mult1.Weights), ...
+          gather(params.mult2.Weights), ...
+          gather(params.mult3.Weights) };
 
-    N = size(featureDataTest, 3);
-    % L_inf size
-    % epsilon = [0.005; 0.01; 0.02; 0.05];
-    targets = {};
-    outputSets = {};
-    rT = {};
+    % Build the test subgraph exactly as in training
+    Atest = sparse(double(adjacencyDataTest));   % N×N sparse adjacency
+    
+    % == CHANGE HERE: no transpose, so Xtest is N×F ==
+    Xtest = dlarray(featureDataTest);            % N×F
+    ytest = labelDataTest;                       % N×1 labels
 
-    for k = 1:length(epsilon)
+    % Normalize adjacency once
+    Averify = normalizeAdjacency(Atest);
 
-        for i = 1:N
+    % Create output directory if needed
+    outDir = fullfile("verification_results","mat_files");
+    if ~exist(outDir, 'dir')
+        mkdir(outDir);
+    end
 
-            [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,i),featureDataTest(:,:,i),labelDataTest(i,:));
+    % Verify under each ε
+    for k = 1:numel(epsilon)
+        epsi = epsilon(k);
 
-            XTest = dlarray(XTest);
-            Averify = normalizeAdjacency(ATest);
+        % Build a single ImageStar over all node features
+        lb = extractdata(Xtest - epsi);    % N×F
+        ub = extractdata(Xtest + epsi);    % N×F
+        Xverify = ImageStar(lb, ub);       % V is N×F×1×nDirs
 
-            lb = extractdata(XTest-epsilon(k));
-            ub = extractdata(XTest+epsilon(k));
+        tStart = tic;
+        Rstars = computeReachability(W, ReluLayer(), 'approx-star', Xverify, Averify);
+        elapsed = toc(tStart);
 
-            Xverify = ImageStar(lb,ub);
-
-            t = tic;
-
-            reachMethod = 'approx-star';
-            L = ReluLayer();
-
-            Y = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, Averify);
-
-            % store results
-            outputSets{i} = Y;
-            targets{i} = labelsTest;
-            rT{i} = toc(t);
-        end
-
-        if ~exist('results', 'dir')
-            mkdir('results');
-        end
-        
-        save("verification_results/mat_files/verified_nodes_"+modelPath+"_eps_"+string(epsilon(k))+".mat", "outputSets", "targets", "rT", '-v7.3');
-        disp("SAVED")
-
+        % Save results
+        save(fullfile(outDir, ...
+            "verified_nodes_" + modelPath + "_eps_" + string(epsi) + ".mat"), ...
+            'Rstars', 'ytest', 'elapsed', '-v7.3');
+        fprintf("ε=%.4f verified in %.2fs\n", epsi, elapsed);
     end
 end
 
-function [adjacency, features, labels] = preprocessData(adjacencyData, featureData, labelData)
-    [adjacency, features] = preprocessPredictors(adjacencyData, featureData);
-    labels = [];
-    for i = 1:size(adjacencyData, 3)
-        numNodes = find(any(adjacencyData(:,:,i)), 1, "last");
-        if isempty(numNodes)
-            numNodes = 0;
-        end
-        T = labelData(i, 1:numNodes);
-        labels = [labels; T(:)];
-    end
-end
-
-function [adjacency, features] = preprocessPredictors(adjacencyData, featureData)
-    adjacency = sparse([]);
-    features = [];
-
-    for i = 1:size(adjacencyData, 3)
-        numNodes = find(any(adjacencyData(:,:,i)), 1, "last");
-        if isempty(numNodes) || numNodes==0
-            continue
-        end
-
-        A = adjacencyData(1:numNodes, 1:numNodes, i);
-        X = featureData(1:numNodes, :, i);
-
-        adjacency = blkdiag(adjacency, A);
-
-        % Concatenate feature rows
-        features = [features; X];
-
-        if mod(i, 500) == 0
-            fprintf('Processing graph %d\n', i);
-        end
-    end
-end
-
+%% ------------------------------------------------------------------------
 function ANorm = normalizeAdjacency(A)
-
-    % Add self connections to adjacency matrix.
+    % Symmetric normalization of sparse adjacency
     A = A + speye(size(A));
-
-    % Compute inverse square root of degree.
-    degree = sum(A, 2);
-    degreeInvSqrt = sparse(sqrt(1./degree));
-
-    % Normalize adjacency matrix.
-    ANorm = diag(degreeInvSqrt) * A * diag(degreeInvSqrt);
-
+    d = sum(A,2);
+    D = spdiags(d.^(-0.5), 0, size(A,1), size(A,1));
+    ANorm = D * A * D;
 end
 
-function Y = computeReachability(weights, L, reachMethod, input, adjMat)
-    Xverify = input;
-    Averify = adjMat; %18 x 18
-    n = size(adjMat,1); %18
+%% ------------------------------------------------------------------------
+function Ynodes = computeReachability(weights, L, reachMethod, Xverify, adjMat)
+    % Performs 3 GCN layers on ImageStar Xverify and slices per‐node stars.
 
-    %%%%%%%%  LAYER 1  %%%%%%%%
+    V = Xverify.V;                          % now N×F×1×nDirs
+    [nNodes, inF, ~, nDirs] = size(V);
 
-    % part 1
-    newV = Xverify.V; %18 x 16 x 1 x 289
-    newV = squeeze(Xverify.V); % 18 x 16 x 289
-    Averify_full = full(Averify);
-    newV = tensorprod(Averify_full, newV, 2, 1); % 18 x 16 x 289
-    w = extractdata(weights{1}); % 16x32
-    newV = tensorprod(newV, extractdata(weights{1}), 2, 1); %18 x 289 x 32
-    newV = reshape(newV, [size(newV,1), size(newV,2), 1, size(newV,3)]); % 18 x 289 x 1 x 32
-    newV = permute(newV, [1 4 3 2]); % 18 x 32 x 1 x 289
-    X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub); % 18 x 32 x 1 x 289
-    % part 2 %
-    X2b = L.reach(X2, reachMethod); % 18 x 32 x 1 x 289
-    repV = repmat(Xverify.V,[1,2,1,1]); %18 x 32 x 1 x 289
-    Xrep = ImageStar(repV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
-    % X2b_ = X2b.MinkowskiSum(Xrep);
-    % size(X2b_.V)
+    % --- Layer 1 ---
+    V1 = reshape(V, [nNodes, inF, nDirs]);                   
+    V1 = tensorprod(full(adjMat), V1, 2, 1);                 
+    V1 = tensorprod(V1,            weights{1},  2, 1);      
+    V1 = permute(V1, [1 3 4 2]);                             
+    S1 = ImageStar(V1, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
+    R1 = L.reach(S1, reachMethod);
 
-    %%%%%%%%  LAYER 2  %%%%%%%%
+    % --- Layer 2 ---
+    hid1 = size(R1.V,2);
+    V2 = reshape(R1.V, [nNodes, hid1, nDirs]);
+    V2 = tensorprod(full(adjMat), V2, 2, 1);
+    V2 = tensorprod(V2,               weights{2},  2, 1);
+    V2 = permute(V2, [1 3 4 2]);
+    S2 = ImageStar(V2, R1.C, R1.d, R1.pred_lb, R1.pred_ub);
+    R2 = L.reach(S2, reachMethod);
 
-    % part 1
-    newV = X2b.V;
-    newV = tensorprod(full(Averify), newV, 2, 1);
-    newV = tensorprod(newV, extractdata(weights{2}),2,1);
-    newV = permute(newV, [1 4 2 3]);
-    X3 = ImageStar(newV, X2b.C, X2b.d, X2b.pred_lb, X2b.pred_ub);
-    % part 2
-    X3b = L.reach(X3, reachMethod);
-    % X3b_ = X3b.MinkowskiSum(X2b_);
+    % --- Layer 3 ---
+    hid2 = size(R2.V,2);
+    V3 = reshape(R2.V, [nNodes, hid2, nDirs]);
+    V3 = tensorprod(full(adjMat), V3, 2, 1);
+    V3 = tensorprod(V3,               weights{3},  2, 1);
+    V3 = permute(V3, [1 3 4 2]);
+    S3 = ImageStar(V3, R2.C, R2.d, R2.pred_lb, R2.pred_ub);
 
-    %%%%%%%%  LAYER 3  %%%%%%%%
-
-    newV = X3b.V;
-    newV = tensorprod(full(Averify), newV, 2, 1);
-    newV = tensorprod(newV, extractdata(weights{3}), 2, 1);
-    newV = permute(newV, [1 4 2 3]);
-    Y = ImageStar(newV, X3b.C, X3b.d, X3b.pred_lb, X3b.pred_ub);
-
-     %%%%%%%%  LAYER 4  %%%%%%%%
-    % numNodes = size(Y_conv.V,1);
-    % Y_nodes = cell(numNodes,1);
-
-    % for nodeIdx = 1:numNodes
-    %     Y_node = Y_conv.slice(1, nodeIdx);  
-    %     Y_final_node = Y_node.affineMap(w1, w2);  
-    %     Y_nodes{nodeIdx} = Y_final_node;
-    % end
-    % Y = Y_nodes;
-
-
-end
-
-function sym = labelSymbol(labelNumbers)
-    sym = strings(size(labelNumbers));
-    for k = 1:numel(labelNumbers)
-        switch labelNumbers(k)
-            case 1
-                sym(k) = "Not Compromised";
-            case 2
-                sym(k) = "Compromised";
-            case 3
-                sym(k) = "Highly Compromised";
-            otherwise
-                error("Invalid label number: %g. Supported labels are 0,1,2,3.", labelNumbers(k));
-        end
+    % Slice off each node’s output star
+    Ynodes = cell(nNodes,1);
+    for u = 1:nNodes
+        Ynodes{u} = S3.slice(1, u);
     end
 end
