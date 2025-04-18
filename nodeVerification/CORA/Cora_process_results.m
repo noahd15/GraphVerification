@@ -22,7 +22,7 @@ for m=1:length(seeds)
 
     for k = 1:eN
         % Load data one at a time
-        load("results/verified_nodes_"+modelPath+"_eps"+string(epsilon(k))+".mat"); % adapt to your files
+        load("results/verified_nodes_"+modelPath+"_eps"+string(epsilon(k))+".mat"); 
 
         N = length(targets);
         for i=1:N

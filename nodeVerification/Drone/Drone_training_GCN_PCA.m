@@ -7,45 +7,43 @@ if isempty(projectRoot)
     error('AV_PROJECT_HOME environment variable is not set. Please set it to your project root directory.');
 end
 
-% Load in data
-dataFile = fullfile(projectRoot, 'data', 'node.mat');
+% Load in reduced data from PCA
+dataFile = fullfile(projectRoot, 'data/reducedDatasetNode.mat');
 data = load(dataFile);
 
+disp(data);
+
 % Extract feature and label data
-featureData = data.features;
-labelData = double(permute(data.labels, [2 1]));
-if size(labelData, 1) < size(labelData, 2)
-    labelData = labelData';
-end
-labelData = labelData + 1;  % Converts 0,1,2 into 1,2,3
+featureData = data.featureData_reduced; % Use the reduced features
+labelData = data.labelData;
+adjacencyData = data.adjacencyData;
+
+whos adjacencyData
+whos featureData
+whos labelData
+
+% Get the indices for train, validation, and test sets
+idxTrain = data.idxTrain;
+idxValidation = data.idxValidation;
+idxTest = data.idxTest;
 
 rng(2024);
 numGraphs = size(labelData, 1);
-
-% Convert edge indices to adjacency matrices
-adjacencyData = edges2Adjacency(data);
 numObservations = size(adjacencyData, 3);
 
-% Split into train, validation, test
-[idxTrain, idxValidation, idxTest] = trainingPartitions(numObservations, [0.8 0.1 0.1]);
-
-% Get training arrays (keep full 3D arrays for batching)
+% Extract training, validation, and test data
 adjacencyDataTrain = adjacencyData(:, :, idxTrain);
 featureDataTrain = featureData(:, :, idxTrain);
 labelDataTrain = labelData(idxTrain, :);
 
-% Get validation data (using full processing for evaluation)
-[ AValidation, XValidation, labelsValidation ] = preprocessData( ...
-    adjacencyData(:, :, idxValidation), featureData(:, :, idxValidation), labelData(idxValidation, :), ...
-    'preprocessedPredictors_val.mat');
+% Use different cache filenames for the reduced features
+[~, XTrain_full, labelsTrain_full] = preprocessData(adjacencyDataTrain, featureDataTrain, labelDataTrain, 'preprocessedPredictors_train_PCA.mat');
+[AValidation, XValidation, labelsValidation ] = preprocessData(adjacencyData(:, :, idxValidation), featureData(:, :, idxValidation), labelData(idxValidation, :), 'preprocessedPredictors_val_PCA.mat');
+[ATest, XTest, labelsTest] = preprocessData(adjacencyData(:, :, idxTest), featureData(:, :, idxTest), labelData(idxTest, :), 'preprocessedPredictors_test_PCA.mat');
 
-% Convert training labels to categorical using preprocessing (they are already categorical)
-[~, XTrain_full, labelsTrain_full] = preprocessData( ...
-    adjacencyDataTrain, featureDataTrain, labelDataTrain, 'preprocessedPredictors_train.mat');
 classes = categories(labelsTrain_full);   % Classes as categorical strings
 numClasses = numel(classes);
 
-% Compute class weights (using full training labels)
 classList = categories(labelsTrain_full);
 counts = countcats(labelsTrain_full);
 classWeights = 1 ./ counts;
@@ -61,22 +59,29 @@ for i = 1:length(seeds)
     % Initialize network parameters structure
     parameters = struct;
     numHiddenFeatureMaps = 32;
-    numInputFeatures = size(XTrain_full, 2);  % Dimension of feature rows
+    % Get the correct input feature dimension from the reduced features
+    [~, numInputFeatures, ~] = size(featureData);
+    fprintf('Input feature dimension: %d\n', numInputFeatures);
 
-    % Layer 1
+    % Layer 1 - First Graph Convolution
     sz = [numInputFeatures, numHiddenFeatureMaps];
-    parameters.mult1.Weights = initializeGlorot(sz, numHiddenFeatureMaps, numInputFeatures, "double");
+    parameters.mult1.Weights = dlarray(initializeGlorot(sz, numHiddenFeatureMaps, numInputFeatures, "double"));
 
-    % Layer 2
+    % Layer 2 - Second Graph Convolution
     sz = [numHiddenFeatureMaps, numHiddenFeatureMaps];
-    parameters.mult2.Weights = initializeGlorot(sz, numHiddenFeatureMaps, numHiddenFeatureMaps, "double");
+    parameters.mult2.Weights = dlarray(initializeGlorot(sz, numHiddenFeatureMaps, numHiddenFeatureMaps, "double"));
 
-    % Layer 3
+    % Layer 3 - Third Graph Convolution (outputs directly to numClasses)
     sz = [numHiddenFeatureMaps, numClasses];
-    parameters.mult3.Weights = initializeGlorot(sz, numClasses, numHiddenFeatureMaps, "double");
+    parameters.mult3.Weights = dlarray(initializeGlorot(sz, numClasses, numHiddenFeatureMaps, "double"));
+
+    % % Layer 4 - Final Linear Layer (not used in this version)
+    % sz = [numHiddenFeatureMaps, numClasses];
+    % parameters.fc.Weights = dlarray(initializeGlorot(sz, numClasses, numHiddenFeatureMaps, "double"));
+    % parameters.fc.Bias = dlarray(zeros(1, numClasses, "double"));
 
     %% Training Setup
-    numEpochs = 200;
+    numEpochs = 50;
     learnRate = 0.001;
     validationFrequency = 10;  % Used here only for diagnostic printing
 
@@ -145,7 +150,7 @@ for i = 1:length(seeds)
         train_losses(epoch) = epochLoss / numBatches;
 
         % Evaluate on the full preprocessed training set to compute training metrics
-        [ATrain_full, XTrain_full, labelsTrain_full] = preprocessData(adjacencyDataTrain, featureDataTrain, labelDataTrain, 'preprocessedPredictors_train.mat');
+        [ATrain_full, XTrain_full, labelsTrain_full] = preprocessData(adjacencyDataTrain, featureDataTrain, labelDataTrain, 'preprocessedPredictors_train_PCA.mat');
         XTrain_full = dlarray(XTrain_full);
         % labelsTrain_full is already categorical, so no extra conversion is needed.
         TTrain_full = onehotencode(labelsTrain_full, 2, 'ClassNames', classes);
@@ -179,8 +184,6 @@ for i = 1:length(seeds)
     end
 
     %% Final Testing (Performed only once after training)
-    [ATest, XTest, labelsTest] = preprocessData(adjacencyData(:, :, idxTest), featureData(:, :, idxTest), labelData(idxTest, :), 'preprocessedPredictors_test.mat');
-    % labelsTest is already categorical via preprocessData.
     TTest = onehotencode(labelsTest, 2, 'ClassNames', classes);
     YTest = model(parameters, XTest, ATest);
     YTestClass = onehotdecode(YTest, classes, 2);
@@ -229,16 +232,15 @@ for i = 1:length(seeds)
     saveas(gcf, fullfile(logsDir, 'batched_confusion_matrix.png'));
 
     % Plot training and validation metrics over epochs (if desired)
-    plotTrainingMetrics(train_losses, val_losses, [], train_accs, val_accs, [], ...
-        train_precision, train_recall, train_f1, val_precision, val_recall, val_f1, [], [], [], validationFrequency);
+    plotTrainingMetrics(train_losses, val_losses, [], train_accs, val_accs, [], train_precision, train_recall, train_f1, val_precision, val_recall, val_f1, [], [], [], validationFrequency);
 
     % Save the model and training logs
-    save("models/node_gcn_" + string(seed) + ".mat", "testAcc", "parameters", "precision", "recall", "f1", ...
+    save("models/drone_node_gcn_" + string(seed) + ".mat", "testAcc", "parameters", "precision", "recall", "f1", ...
         "train_losses", "val_losses", "train_accs", "val_accs", "train_precision", "train_recall", "train_f1", ...
         "val_precision", "val_recall", "val_f1");
 end
 
-%% Helper Function: Create Mini-Batch
+%% Create Mini-Batch
 function [A_batch, X_batch, labels_batch] = createMiniBatch(adjacencyData, featureData, labelData, batchIndices)
     % Initialize empty matrices for this mini-batch
     A_batch = sparse([]);
@@ -262,7 +264,7 @@ function [A_batch, X_batch, labels_batch] = createMiniBatch(adjacencyData, featu
     end
 end
 
-%% (The existing helper functions remain unchanged)
+%% Other Helper Functions
 function [adjacency, features, labels] = preprocessData(adjacencyData, featureData, labelData, cacheFileName)
     projectRoot = getenv('AV_PROJECT_HOME');
     cacheFile = fullfile(projectRoot, 'data', cacheFileName);
@@ -310,7 +312,7 @@ function sym = labelSymbol(labelNumbers)
     if iscategorical(labelNumbers)
         labelNumbers = double(labelNumbers);
     end
-    sym = strings(size(labelN umbers));
+    sym = strings(size(labelNumbers));
     for k = 1:numel(labelNumbers)
         switch labelNumbers(k)
             case 1
@@ -327,24 +329,39 @@ end
 
 function Y = model(parameters, X, A)
     ANorm = normalizeAdjacency(A);
-    % Z1 = X;
-    % Z2 = relu(ANorm * Z1 * parameters.mult1.Weights);
-    % Z3 = relu(ANorm * Z2 * parameters.mult2.Weights);
-    % Z4 = ANorm * Z3 * parameters.mult3.Weights;
-    % Y = softmax(Z4, DataFormat="BC");
+    % fprintf('Conv1 size: A x X x W1 = %s x %s x %s\n', mat2str(size(ANorm)), mat2str(size(X)), mat2str(size(parameters.mult1.Weights)));
     conv1 = ANorm * X * parameters.mult1.Weights;
     relu1 = relu(conv1);
+    % fprintf('Conv2 size: A x relu1 x W2 = %s x %s x %s\n', mat2str(size(ANorm)), mat2str(size(relu1)), mat2str(size(parameters.mult2.Weights)));
     conv2 = ANorm * relu1 * parameters.mult2.Weights;
     relu2 = relu(conv2);
+    % fprintf('Conv3 size: A x relu2 x W3 = %s x %s x %s\n', mat2str(size(ANorm)), mat2str(size(relu2)), mat2str(size(parameters.mult3.Weights)));
     conv3 = ANorm * relu2 * parameters.mult3.Weights;
-    lin1 = conv3 * parameters.fc.Weights + parameters.fc.Bias;
-    Y = softmax(lin1, DataFormat="BC");
+    Y = softmax(conv3, DataFormat="BC");
+
+    % lin1 = conv3 * parameters.fc.Weights + parameters.fc.Bias;
+    % Y = softmax(lin1, DataFormat="BC");
 
 end
 
 function [loss, gradients] = modelLoss(parameters, X, A, T, classWeights)
+    % Make sure parameters are properly traced for automatic differentiation
+    % Convert parameters to dlarray if they aren't already
+    if ~isa(parameters.mult1.Weights, 'dlarray')
+        parameters.mult1.Weights = dlarray(parameters.mult1.Weights);
+        parameters.mult2.Weights = dlarray(parameters.mult2.Weights);
+        parameters.mult3.Weights = dlarray(parameters.mult3.Weights);
+        % parameters.fc.Weights = dlarray(parameters.fc.Weights);
+        % parameters.fc.Bias = dlarray(parameters.fc.Bias);
+    end
+
+    % Forward pass through the model
     Y = model(parameters, X, A);
+
+    % Calculate loss
     loss = crossentropy(Y, T, classWeights, DataFormat="BC", WeightsFormat="UC");
+
+    % Calculate gradients
     gradients = dlgradient(loss, parameters);
 end
 
@@ -353,6 +370,14 @@ function ANorm = normalizeAdjacency(A)
     degree = sum(A, 2);
     degreeInvSqrt = sparse(sqrt(1./degree));
     ANorm = diag(degreeInvSqrt) * A * diag(degreeInvSqrt);
+end
+
+function weights = initializeGlorot(sz, fanOut, fanIn, dataType)
+    % Initialize weights using Glorot initialization
+    % This helps with training deep networks by keeping the variance of activations
+    % roughly the same across layers
+    stddev = sqrt(2 / (fanIn + fanOut));
+    weights = stddev * randn(sz, dataType);
 end
 
 function [precision, recall, f1] = calculatePrecisionRecall(predictions, trueLabels)
