@@ -1,4 +1,4 @@
-function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest)
+function reach_model_Linf_CORA(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest)
     % Verification of a Graph Neural Network
 
     load("models/"+modelPath+".mat");
@@ -18,30 +18,34 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
 
     for k = 1:length(epsilon)
 
-        for i = 1:N
+        load("models/"+modelPath+".mat");
 
-            [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,i),featureDataTest(:,:,i),labelDataTest(i,:));
+        % Build test graph once
+        [ATest, XTest, labelsTest] = preprocessData( ...
+            adjacencyDataTest, ...    % N_test×N_test
+            featureDataTest,   ...    % N_test×featureDim
+            labelDataTest      ...    % N_test×1
+        );
 
-            XTest = dlarray(XTest);
-            Averify = normalizeAdjacency(ATest);
+        % Prepare set‑based input
+        XTest   = dlarray(XTest);
+        Averify = normalizeAdjacency(ATest);
 
-            lb = extractdata(XTest-epsilon(k));
-            ub = extractdata(XTest+epsilon(k));
+        lb = extractdata(XTes t - epsilon(k));
+        ub = extractdata(XTest + epsilon(k));
+        Xverify = ImageStar(lb, ub);
 
-            Xverify = ImageStar(lb,ub);
+        t = tic;
 
-            t = tic;
+        reachMethod = 'approx-star';
+        L = ReluLayer();
 
-            reachMethod = 'approx-star';
-            L = ReluLayer();
+        Y = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, Averify);
 
-            Y = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, Averify);
-
-            % store results
-            outputSets{i} = Y;
-            targets{i} = labelsTest;
-            rT{i} = toc(t);
-        end
+        % store results
+        outputSets{i} = Y;
+        targets{i} = labelsTest;
+        rT{i} = toc(t);
 
         if ~exist('results', 'dir')
             mkdir('results');
@@ -54,34 +58,50 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
 end
 
 function [adjacency, features, labels] = preprocessData(adjacencyData, featureData, labelData)
-    [adjacency, features] = preprocessPredictors(adjacencyData, featureData);
-    labels = [];
-    for i = 1:size(adjacencyData, 3)
-        numNodes = find(any(adjacencyData(:,:,i)), 1, "last");
-        if isempty(numNodes)
-            numNodes = 0;
-        end
-        T = labelData(i, 1:numNodes);
-        labels = [labels; T(:)];
-    end
+    % Handle the single Cora graph case (2‑D adjacency & features)
+    %   adjacencyData: N × N
+    %   featureData  : N × F
+    %   labelData    : N × 1
+    %
+    % Returns:
+    %   adjacency : sparse double N×N
+    %   features  : N×F
+    %   labels    : N×1
+
+    % Convert to sparse double
+    adjacency = sparse(double(adjacencyData));
+
+    % Pass features through untouched
+    features = featureData;
+
+    % Make sure labels is a column
+    labels = labelData(:);
 end
 
+
 function [adjacency, features] = preprocessPredictors(adjacencyData, featureData)
-    adjacency = sparse([]);
-    features = [];
+    % Start with an empty sparse‐double matrix
+    adjacency = sparse([], [], [], 0, 0, 0);
+    features  = [];
 
     for i = 1:size(adjacencyData, 3)
+        % Find how many nodes are actually present in this slice
         numNodes = find(any(adjacencyData(:,:,i)), 1, "last");
         if isempty(numNodes) || numNodes==0
             continue
         end
 
-        A = adjacencyData(1:numNodes, 1:numNodes, i);
+        % Extract the single‐precision sparse and convert to sparse double
+        A_single = adjacencyData(1:numNodes, 1:numNodes, i);
+        A = sparse(double(A_single));  
+
+        % Grab the corresponding feature rows
         X = featureData(1:numNodes, :, i);
 
+        % Build the big block‑diagonal adjacency
         adjacency = blkdiag(adjacency, A);
 
-        % Concatenate feature rows
+        % Stack the features
         features = [features; X];
 
         if mod(i, 500) == 0
@@ -125,28 +145,28 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     X2b = L.reach(X2, reachMethod); % 18 x 32 x 1 x 289
     repV = repmat(Xverify.V,[1,2,1,1]); %18 x 32 x 1 x 289
     Xrep = ImageStar(repV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
-    X2b_ = X2b.MinkowskiSum(Xrep);
+    % X2b_ = X2b.MinkowskiSum(Xrep);
     % size(X2b_.V)
 
     %%%%%%%%  LAYER 2  %%%%%%%%
 
     % part 1
-    newV = X2b_.V;
+    newV = X2b.V;
     newV = tensorprod(full(Averify), newV, 2, 1);
     newV = tensorprod(newV, extractdata(weights{2}),2,1);
     newV = permute(newV, [1 4 2 3]);
-    X3 = ImageStar(newV, X2b_.C, X2b_.d, X2b_.pred_lb, X2b_.pred_ub);
+    X3 = ImageStar(newV, X2b.C, X2b.d, X2b.pred_lb, X2b.pred_ub);
     % part 2
     X3b = L.reach(X3, reachMethod);
-    X3b_ = X3b.MinkowskiSum(X2b_);
+    % X3b_ = X3b.MinkowskiSum(X2b_);
 
     %%%%%%%%  LAYER 3  %%%%%%%%
 
-    newV = X3b_.V;
+    newV = X3b.V;
     newV = tensorprod(full(Averify), newV, 2, 1);
     newV = tensorprod(newV, extractdata(weights{3}), 2, 1);
     newV = permute(newV, [1 4 2 3]);
-    Y = ImageStar(newV, X3b_.C, X3b_.d, X3b_.pred_lb, X3b_.pred_ub);
+    Y = ImageStar(newV, X3b.C, X3b.d, X3b.pred_lb, X3b.pred_ub);
 
      %%%%%%%%  LAYER 4  %%%%%%%%
     % numNodes = size(Y_conv.V,1);
@@ -160,20 +180,4 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     % Y = Y_nodes;
 
 
-end
-
-function sym = labelSymbol(labelNumbers)
-    sym = strings(size(labelNumbers));
-    for k = 1:numel(labelNumbers)
-        switch labelNumbers(k)
-            case 1
-                sym(k) = "Not Compromised";
-            case 2
-                sym(k) = "Compromised";
-            case 3
-                sym(k) = "Highly Compromised";
-            otherwise
-                error("Invalid label number: %g. Supported labels are 0,1,2,3.", labelNumbers(k));
-        end
-    end
 end

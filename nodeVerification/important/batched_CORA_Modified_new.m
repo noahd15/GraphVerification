@@ -169,16 +169,10 @@ for i = 1:numel(seeds)
     Y_test_cls = onehotdecode(Y_test, string(classes), 2);
     testAcc    = mean(Y_test_cls == y_test_cat);
     [pt, rt, ft] = calculatePrecisionRecall(Y_test_cls, y_test_cat);
+
+    % Scalar test‐set loss
     test_loss = double(crossentropy(Y_test, T_test_full, DataFormat="BC"));
 
-    % --- Plot train/val curves, but no test lines for loss & accuracy ---
-    plotTrainingMetrics( ...
-        train_losses,    val_losses,    NaN,       ...  % third slot is test_loss: use NaN
-        train_accs,      val_accs,      NaN,       ...  % sixth slot is test_acc:  use NaN
-        train_prec,      train_rec,     train_f1,  ...  % train P/R/F1
-        val_prec,        val_rec,       val_f1,    ...  %   val P/R/F1
-        pt(end),         rt(end),       ft(end),   ...  %   test P/R/F1 (scalars)
-        validationFrequency );
     % Plot metrics (train / val / test) – all scalars for test
     plotTrainingMetrics( ...
         train_losses,    val_losses,    test_loss,  ...   % Loss curves

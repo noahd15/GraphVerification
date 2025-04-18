@@ -3,29 +3,20 @@ projectRoot = getenv('AV_PROJECT_HOME');
 addpath(genpath(fullfile(projectRoot, '/nodeVerification/functions/')));
 addpath(genpath(fullfile(projectRoot, '/nodeVerification/models/')));
 
-% Load Cora dataset
-dataFile = fullfile(projectRoot, 'data', 'cora_node.mat');
-data = load(dataFile);
-
-% Full Cora graph
-A_full = data.edge_indices(:,:,1);    % 2708×2708 sparse (possibly single)
-X_full = data.features(:,:,1);        % 2708×featureDim
-y_full = double(data.labels(:)) + 1;   % 2708×1, labels 1–7
+% 2) Load Cora
+dataFile  = fullfile(projectRoot, 'data', 'cora_node.mat');
+data      = load(dataFile);
+A_full    = data.edge_indices(:,:,1);      % 2708×2708
+X_full    = data.features(:,:,1);          % 2708×featureDim
+y_full    = double(data.labels(:)) + 1;    % 2708×1
 [numNodes, featureDim] = size(X_full);
+
+% 3) Train/Val/Test split (same as before)
 rng(2024);
-
-% Train/Val/Test node splits
-indices = randperm(numNodes);
-nTrain = round(0.8 * numNodes);
-nVal = round(0.1 * numNodes);
-idxTrain = indices(1:nTrain);
-idxValidation = indices(nTrain+1 : nTrain+nVal);
-idxTest = indices(nTrain+nVal+1 : end);
-
-% Prepare test data for verification
-adjacencyDataTest = A_full(idxTest, idxTest);
-featureDataTest = X_full(idxTest, :);
-labelDataTest = y_full(idxTest);
+indices      = randperm(numNodes);
+nTrain       = round(0.8 * numNodes);
+nVal         = round(0.1 * numNodes);
+idxTest      = indices(nTrain+nVal+1 : end);
 
 %% Verify models
 
@@ -41,6 +32,6 @@ for k = 1:length(seeds)
 
     fprintf('Verifying model %s with epsilon %.4f\n', modelPath, epsilon);
 
-    reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest);
+    reach_model_Linf_CORA(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest);
 end
 
