@@ -1,5 +1,7 @@
 canUseGPU = false;
 
+addpath(genpath(fullfile(projectRoot, '/node_verification/functions/')));
+
 projectRoot = getenv('AV_PROJECT_HOME');
 if isempty(projectRoot)
     error('Set AV_PROJECT_HOME to your project root.');
@@ -14,6 +16,21 @@ y_full   = double(data.labels(:)) + 1;
 rng(2024);
 [idxTrain, idxValidation, idxTest] = trainingPartitions(numNodes, [0.8 0.1 0.1]);
 
+%% Prepare full‑batch data once
+X_train_full = dlarray(X_full(idxTrain, :));
+A_train_full = A_full(idxTrain, idxTrain);
+T_train_full = onehotencode(y_train_cat, 2, 'ClassNames', string(classes));
+
+% Prepare validation‑set data
+X_val_full = dlarray( X_full(idxValidation, :) );
+A_val_full = A_full(idxValidation, idxValidation);
+T_val_full = onehotencode( y_val_cat, 2, 'ClassNames', string(classes) );
+if canUseGPU
+    X_val_full = gpuArray(X_val_full);
+    A_val_full = gpuArray(A_val_full);   % only if A is small dense array, otherwise leave sparse
+    T_val_full = gpuArray(T_val_full);
+end
+
 classes       = unique(y_full);
 numClasses    = numel(classes);
 classNames    = string(1:numClasses);
@@ -27,6 +44,7 @@ classWeights = (1 ./ counts) ./ sum(1./counts) * numel(classes);
 %% Network Initialization
 seeds = [1];
 for i = 1:numel(seeds)
+    seed = seeds(i);
     rng(seeds(i));
     parameters = struct;
     numHiddenFeatureMaps = 32;
@@ -38,10 +56,6 @@ for i = 1:numel(seeds)
     parameters.mult2.Weights = dlarray(initializeGlorot([numHiddenFeatureMaps, numHiddenFeatureMaps], numHiddenFeatureMaps, numHiddenFeatureMaps, "double"));
     parameters.mult3.Weights = dlarray(initializeGlorot([numHiddenFeatureMaps, numClasses],         numClasses,        numHiddenFeatureMaps, "double"));
 
-    %% Prepare full‑batch data once
-    X_train_full = dlarray(X_full(idxTrain, :));
-    A_train_full = A_full(idxTrain, idxTrain);
-    T_train_full = onehotencode(y_train_cat, 2, 'ClassNames', string(classes));
     if canUseGPU
         X_train_full = gpuArray(X_train_full);
     end
