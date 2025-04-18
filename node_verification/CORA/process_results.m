@@ -15,14 +15,14 @@ eN = length(epsilon);
 for m=1:length(seeds)
 
     % get model
-    modelPath = "node_gcn_"+string(seeds(m));
+    modelPath = "cora_node_gcn_"+string(seeds(m));
     
     % initialize vars
     samples = zeros(eN,4);
 
     for k = 1:eN
         % Load data one at a time
-        load("results/verified_nodes_"+modelPath+"_eps"+string(epsilon(k))+".mat"); 
+        load("verification_results/mat_files/verified_nodes_"+modelPath+"_eps_"+string(epsilon(k))+".mat"); 
 
         N = length(targets);
         for i=1:N
@@ -41,14 +41,14 @@ for m=1:length(seeds)
     end
 
     % Save summary
-    save("results/summary_results_"+modelPath+".mat", "samples");
+    save("verification_results/mat_files/summary_results_"+modelPath+".mat", "samples");
 
     model = load("models/"+modelPath+".mat");
     
     % Create table with these values
-    fileID = fopen("results/summary_results_"+modelPath+".txt",'w');
-    fprintf(fileID, 'Summary of the model with accuracy = %.4f\n', "");
-    fprintf(fileID,'                 ATOMS \n');
+    fileID = fopen("verification_results/summary_results_"+modelPath+".txt",'w');
+    fprintf(fileID, 'Summary of robustness results of CORA gnn model with accuracy = %.4f \n\n', model.testAcc);
+    fprintf(fileID,'                 Compromised \n');
     fprintf(fileID, 'Epsilon | Robust  Unknown  Not Rob.  N \n');
     fprintf(fileID, '  0.005 | %.3f    %.3f   %.3f   %d \n', samples(1,1)/samples(1,4), samples(1,2)/samples(1,4), samples(1,3)/samples(1,4), samples(1,4));
     % fprintf(fileID, '   0.01 | %.3f    %.3f   %.3f   %d \n', samples(2,1)/samples(2,4), samples(2,2)/samples(2,4), samples(2,3)/samples(2,4), samples(2,4));

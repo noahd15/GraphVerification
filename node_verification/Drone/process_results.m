@@ -47,7 +47,7 @@ for m=1:length(seeds)
     
     % Create table with these values
     fileID = fopen("verification_results/summary_results_"+modelPath+".txt",'w');
-    fprintf(fileID, 'Summary of robustness results of gnn model with accuracy = %.4f \n\n', model.testAcc);
+    fprintf(fileID, 'Summary of robustness results of Drone gnn model with accuracy = %.4f \n\n', model.testAcc);
     fprintf(fileID,'                 Compromised \n');
     fprintf(fileID, 'Epsilon | Robust  Unknown  Not Rob.  N \n');
     fprintf(fileID, '  0.005 | %.3f    %.3f   %.3f   %d \n', samples(1,1)/samples(1,4), samples(1,2)/samples(1,4), samples(1,3)/samples(1,4), samples(1,4));

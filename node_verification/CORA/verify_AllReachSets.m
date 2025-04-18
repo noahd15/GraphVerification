@@ -5,18 +5,17 @@ seeds = [1];
 
 parfor m = 1:length(seeds)
 
-    modelPath = "node_gcn_" + string(seeds(m));
+    modelPath = "cora_node_gcn_" + string(seeds(m));
     
     for k = 1:length(epsilon)
         % Load outputs (must match how you saved them)
-        rdata = load("results/verified_nodes_" + modelPath + "_eps" + string(epsilon(k)) + ".mat");
+        rdata = load("verification_results/mat_files/verified_nodes_" + modelPath + "_eps_" + string(epsilon(k)) + ".mat");
 
         % Check verification result
         results = cell(size(rdata.outputSets));
         for i = 1:length(rdata.outputSets)
             Y = rdata.outputSets{i};
             lbl = rdata.targets{i};
-            % Rename verifyAtom -> verifySample or similar
             results{i} = verifySample(Y, lbl);
         end
         
@@ -25,7 +24,6 @@ parfor m = 1:length(seeds)
     end
 
 end
-
 
 function results = verifySample(X, target)
     % Generic sample-level verification
@@ -100,7 +98,7 @@ function index = getLabelIndex(label)
 end
 
 function parsave(modelPath, epsilon, results, outputSets, rT, targets)
-    save("results/verified_nodes_" + modelPath + "_eps" + string(epsilon) + ".mat", ...
+    save("verification_results/mat_files/verified_nodes_" + modelPath + "_eps_" + string(epsilon) + ".mat", ...
          "results", "outputSets", "rT", "targets");
 end
 
