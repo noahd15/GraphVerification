@@ -4,19 +4,18 @@ addpath(genpath(fullfile(projectRoot, '/node_verification/functions/')));
 addpath(genpath(fullfile(projectRoot, '/node_verification/models/')));
 addpath(genpath('/users/noahdahle/nnv'))
 
-dataFile = fullfile(projectRoot, 'data', 'reducedDatasetNode.mat');
-data = load(dataFile);
-rng(0);
+data = load(fullfile(projectRoot, 'data', 'cora_node.mat'));
+A_full     = data.edge_indices(:,:,1);    
+X_full     = data.features(:,:,1);        
+y_full     = double(data.labels(:)) + 1;  
+numNodes   = size(X_full,1);
 
-adjacencyData = data.adjacencyData;
-featureData = data.featureData_reduced;
-labelData = data.labelData;
+rng(2024);
+[~, ~, idxTest] = trainingPartitions(numNodes, [0.8 0.1 0.1]);
 
-idxTest = data.idxTest;
-
-adjacencyDataTest = adjacencyData(:,:,idxTest);
-featureDataTest = featureData(:,:,idxTest);
-labelDataTest = labelData(idxTest,:);
+adjacencyDataTest = A_full(idxTest, idxTest);
+featureDataTest   = X_full(idxTest, :);
+labelDataTest     = y_full(idxTest);
 
 fprintf('Number of test samples: %d\n', length(idxTest));
 fprintf('Feature dimension: %d\n', size(featureDataTest, 2));
