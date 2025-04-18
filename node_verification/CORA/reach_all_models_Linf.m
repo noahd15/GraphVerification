@@ -2,7 +2,7 @@ projectRoot = getenv('AV_PROJECT_HOME');
 
 addpath(genpath(fullfile(projectRoot, '/node_verification/functions/')));
 addpath(genpath(fullfile(projectRoot, '/node_verification/models/')));
-addpath(genpath('/users/noahdahle/nnv'))
+
 
 data = load(fullfile(projectRoot, 'data', 'cora_node.mat'));
 A_full     = data.edge_indices(:,:,1);    
@@ -25,7 +25,7 @@ fprintf('Feature dimension: %d\n', size(featureDataTest, 2));
 % Study Variables
 % seeds = [0,1,2,3,4]; % models
 seeds = [1]; % models
-epsilon = [0.000005]; % attack
+epsilon = [0.0005]; % attack
 
 % Verify one model at a time - using regular for loop instead of parfor to avoid file access issues
 for k = 1:length(seeds)

@@ -1,6 +1,6 @@
 %% Verify the robustness reach sets of all models
 % Adjust epsilon and seeds as needed
-epsilon = [0.000005] %; 0.01; 0.02; 0.05];
+epsilon = [0.005] %; 0.01; 0.02; 0.05];
 seeds = [1];
 
 parfor m = 1:length(seeds)

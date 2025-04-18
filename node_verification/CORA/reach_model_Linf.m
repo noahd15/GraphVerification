@@ -1,6 +1,14 @@
 function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest)
     % Verification of a Graph Neural Network
 
+
+    adjacencyDataTest = reshape(adjacencyDataTest, [size(adjacencyDataTest, 1), size(adjacencyDataTest, 2), 1]);
+    featureDataTest = reshape(featureDataTest, [size(featureDataTest, 1), size(featureDataTest, 2), 1]);
+
+    fprintf('adjacencyDataTest size: %d x %d x %d\n', size(adjacencyDataTest, 1), size(adjacencyDataTest, 2), size(adjacencyDataTest, 3));
+    fprintf('featureDataTest size: %d x %d x %d\n', size(featureDataTest, 1), size(featureDataTest, 2), size(featureDataTest, 3));
+
+
     load("models/"+modelPath+".mat");
 
     w1 = gather(parameters.mult1.Weights);
@@ -91,11 +99,11 @@ function [adjacency, features] = preprocessPredictors(adjacencyData, featureData
         end
     end
 
-    adjacency = reshape(adjacency, [size(adjacency, 1), size(adjacency, 2), 1]);
-    features = reshape(features, [size(features, 1), size(features, 2), 1]);
+    % adjacency = reshape(adjacency, [size(adjacency, 1), size(adjacency, 2), 1]);
+    % features = reshape(features, [size(features, 1), size(features, 2), 1]);
 
-    fprintf('Feature dimensions: %d x %d x %d\n', size(features, 1), size(features, 2), size(features, 3));
-    fprintf('Adjacency dimensions: %d x %d x %d\n', size(adjacency, 1), size(adjacency, 2), size(adjacency, 3));
+    % fprintf('Feature dimensions: %d x %d x %d\n', size(features, 1), size(features, 2), size(features, 3));
+    % fprintf('Adjacency dimensions: %d x %d x %d\n', size(adjacency, 1), size(adjacency, 2), size(adjacency, 3));
 end
 
 function ANorm = normalizeAdjacency(A)
