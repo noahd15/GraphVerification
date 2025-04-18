@@ -61,7 +61,7 @@ for i = 1:numel(seeds)
     end
 
     %% Training Setup
-    numEpochs = 2;
+    numEpochs = 150;
     learnRate = 0.001;
     trailingAvg   = [];
     trailingAvgSq = [];

@@ -81,7 +81,7 @@ for i = 1:length(seeds)
     % parameters.fc.Bias = dlarray(zeros(1, numClasses, "double"));
 
     %% Training Setup
-    numEpochs = 2;
+    numEpochs = 100;
     learnRate = 0.001;
     validationFrequency = 10;  % Used here only for diagnostic printing
 

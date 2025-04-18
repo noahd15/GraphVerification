@@ -59,7 +59,9 @@ function [adjacency, features, labels] = preprocessData(adjacencyData, featureDa
         if isempty(numNodes)
             numNodes = 0;
         end
-        T = labelData(i, 1:numNodes);
+
+        % Fix: Use only the first numNodes elements from the i-th row
+        T = labelData(i, 1:min(numNodes, size(labelData,2)));
         labels = [labels; T(:)];
     end
 end
@@ -77,6 +79,8 @@ function [adjacency, features] = preprocessPredictors(adjacencyData, featureData
         A = adjacencyData(1:numNodes, 1:numNodes, i);
         X = featureData(1:numNodes, :, i);
 
+
+
         adjacency = blkdiag(adjacency, A);
 
         % Concatenate feature rows
@@ -86,6 +90,12 @@ function [adjacency, features] = preprocessPredictors(adjacencyData, featureData
             fprintf('Processing graph %d\n', i);
         end
     end
+
+    adjacency = reshape(adjacency, [size(adjacency, 1), size(adjacency, 2), 1]);
+    features = reshape(features, [size(features, 1), size(features, 2), 1]);
+
+    fprintf('Feature dimensions: %d x %d x %d\n', size(features, 1), size(features, 2), size(features, 3));
+    fprintf('Adjacency dimensions: %d x %d x %d\n', size(adjacency, 1), size(adjacency, 2), size(adjacency, 3));
 end
 
 function ANorm = normalizeAdjacency(A)
@@ -116,6 +126,7 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     newV = tensorprod(Averify_full, newV, 2, 1); % 18 x 16 x 289
     w = extractdata(weights{1}); % 16x32
     newV = tensorprod(newV, extractdata(weights{1}), 2, 1); %18 x 289 x 32
+    fprintf('newV size: %d x %d x %d\n', size(newV,1), size(newV,2), size(newV,3));
     newV = reshape(newV, [size(newV,1), size(newV,2), 1, size(newV,3)]); % 18 x 289 x 1 x 32
     newV = permute(newV, [1 4 3 2]); % 18 x 32 x 1 x 289
     X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub); % 18 x 32 x 1 x 289
@@ -158,20 +169,4 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     % Y = Y_nodes;
 
 
-end
-
-function sym = labelSymbol(labelNumbers)
-    sym = strings(size(labelNumbers));
-    for k = 1:numel(labelNumbers)
-        switch labelNumbers(k)
-            case 1
-                sym(k) = "Not Compromised";
-            case 2
-                sym(k) = "Compromised";
-            case 3
-                sym(k) = "Highly Compromised";
-            otherwise
-                error("Invalid label number: %g. Supported labels are 0,1,2,3.", labelNumbers(k));
-        end
-    end
 end

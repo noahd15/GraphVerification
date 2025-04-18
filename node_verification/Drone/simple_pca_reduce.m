@@ -6,8 +6,8 @@ if isempty(projectRoot)
     error('AV_PROJECT_HOME environment variable is not set. Please set it to your project root directory.');
 end
 
-addpath(genpath(fullfile(projectRoot, '/nodeVerification/important/functions/')));
-addpath(genpath(fullfile(projectRoot, '/nodeVerification/important/models/')));
+addpath(genpath(fullfile(projectRoot, '/node_verification/functions/')));
+addpath(genpath(fullfile(projectRoot, '/node_verification/models/')));
 
 %% Load original data
 dataFile = fullfile(projectRoot, 'data', 'node.mat');

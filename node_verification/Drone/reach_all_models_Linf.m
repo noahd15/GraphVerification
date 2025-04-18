@@ -2,7 +2,7 @@ projectRoot = getenv('AV_PROJECT_HOME');
 
 addpath(genpath(fullfile(projectRoot, '/node_verification/functions/')));
 addpath(genpath(fullfile(projectRoot, '/node_verification/models/')));
-addpath(genpath('/users/noahdahle/nnv'))
+addpath(genpath('/Users/Noah/nnv'));
 
 dataFile = fullfile(projectRoot, 'data', 'reducedDatasetNode.mat');
 data = load(dataFile);

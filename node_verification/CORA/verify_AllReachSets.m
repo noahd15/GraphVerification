@@ -1,6 +1,6 @@
 %% Verify the robustness reach sets of all models
 % Adjust epsilon and seeds as needed
-epsilon = [0.005] %; 0.01; 0.02; 0.05];
+epsilon = [0.000005] %; 0.01; 0.02; 0.05];
 seeds = [1];
 
 parfor m = 1:length(seeds)
@@ -64,7 +64,7 @@ function Hs = label2Hs(label)
     % fprintf('Star dimension: %d\n', Y.dim);
     
     % Then set outSize to match your actual model output dimension
-    outSize = 3; 
+    outSize = 272*7; 
     target = getLabelIndex(label);
 
     % Create verification constraints matching your model's output dimension
@@ -79,18 +79,32 @@ function Hs = label2Hs(label)
 end
 
 function index = getLabelIndex(label)
-    % If label is already a numeric index
+    % CORA dataset labels (7 classes)
+    % 1: 'Case_Based'
+    % 2: 'Genetic_Algorithms'
+    % 3: 'Neural_Networks'
+    % 4: 'Probabilistic_Methods'
+    % 5: 'Reinforcement_Learning'
+    % 6: 'Rule_Learning'
+    % 7: 'Theory'
     if isnumeric(label)
         index = label;
     else
-        % Your existing switch statement for string/categorical labels
-        switch label
-            case 'Normal'
+        switch string(label)
+            case {'Case_Based', 'case_based'}
                 index = 1;
-            case 'Low Privilege'
+            case {'Genetic_Algorithms', 'genetic_algorithms'}
                 index = 2;
-            case 'Compromised'
+            case {'Neural_Networks', 'neural_networks'}
                 index = 3;
+            case {'Probabilistic_Methods', 'probabilistic_methods'}
+                index = 4;
+            case {'Reinforcement_Learning', 'reinforcement_learning'}
+                index = 5;
+            case {'Rule_Learning', 'rule_learning'}
+                index = 6;
+            case {'Theory', 'theory'}
+                index = 7;
             otherwise
                 index = 1; % fallback
         end
