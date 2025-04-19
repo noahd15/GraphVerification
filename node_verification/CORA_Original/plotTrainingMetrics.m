@@ -10,7 +10,7 @@ projectRoot = getenv('AV_PROJECT_HOME');
 if isempty(projectRoot)
     projectRoot = pwd;
 end
-resultsDir = fullfile(projectRoot, 'node_verification/CORA/train_results');
+resultsDir = fullfile(projectRoot, 'node_verification/CORA_Original/train_results');
 if ~exist(resultsDir, 'dir')
     mkdir(resultsDir);
 end
