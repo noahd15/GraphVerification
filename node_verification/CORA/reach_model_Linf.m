@@ -133,25 +133,25 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     X2b = L.reach(X2, reachMethod);
     repV = repmat(Xverify.V,[1,2,1,1]); 
     Xrep = ImageStar(repV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
-    % X2b_ = X2b.MinkowskiSum(Xrep);
+    X2b_ = X2b.MinkowskiSum(Xrep);
 
     %%%%%%%%  LAYER 2  %%%%%%%%
 
     % part 1
-    newV = X2b.V;
+    newV = X2b_.V;
     newV = tensorprod(full(Averify), newV, 2, 1);
     newV = tensorprod(newV, extractdata(weights{2}),2,1);
     newV = permute(newV, [1 4 2 3]);
-    X3 = ImageStar(newV, X2b.C, X2b.d, X2b.pred_lb, X2b.pred_ub);
+    X3 = ImageStar(newV, X2b_.C, X2b_.d, X2b_.pred_lb, X2b_.pred_ub);
     % part 2
     X3b = L.reach(X3, reachMethod);
-    % X3b_ = X3b.MinkowskiSum(X2b_);
+    X3b_ = X3b.MinkowskiSum(X2b_);
 
     %%%%%%%%  LAYER 3  %%%%%%%%
 
-    newV = X3b.V;
+    newV = X3b_.V;
     newV = tensorprod(full(Averify), newV, 2, 1);
     newV = tensorprod(newV, extractdata(weights{3}), 2, 1);
     newV = permute(newV, [1 4 2 3]);
-    Y = ImageStar(newV, X3b.C, X3b.d, X3b.pred_lb, X3b.pred_ub);
+    Y = ImageStar(newV, X3b_.C, X3b_.d, X3b_.pred_lb, X3b_.pred_ub);
 end

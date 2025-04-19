@@ -8,7 +8,7 @@ if isempty(projectRoot)
 end
 
 data = load(fullfile(projectRoot, 'data', 'cora_node.mat'));
-num_features = 32
+num_features = 256
 
 PCA(data.edge_indices, data.features, data.labels, num_features, 'reduced_dataset.mat');
 data = load('reduced_dataset.mat');
@@ -29,7 +29,7 @@ y_train_cat   = categorical(y_full(idxTrain), classes, classNames);
 y_val_cat     = categorical(y_full(idxValidation), classes, classNames);
 y_test_cat    = categorical(y_full(idxTest), classes, classNames);
 
-dropoutRate = 0.5;  % typical value
+dropoutRate = 0.1;  % typical value
 
 counts       = countcats(y_train_cat);
 classWeights = (1 ./ counts) ./ sum(1./counts) * numel(classes);
@@ -69,7 +69,7 @@ for i = 1:numel(seeds)
     end
 
     %% Training Setup
-    numEpochs = 150;
+    numEpochs = 30;
     learnRate = 0.001;
     trailingAvg   = [];
     trailingAvgSq = [];
@@ -139,6 +139,10 @@ for i = 1:numel(seeds)
     testAcc    = mean(Y_test_cls == y_test_cat);
     [pt, rt, ft] = calculatePrecisionRecall(Y_test_cls, y_test_cat);
 
+    testPrec = pt(end);
+    testRec    = rt(end);
+    testF1        = ft(end);
+    
     fprintf('\n=== FINAL TEST ===\nAccuracy: %.4f | Macro‑F1: %.4f\n\n', ...
             testAcc, ft(end));
 
@@ -160,14 +164,14 @@ for i = 1:numel(seeds)
     % Scalar test‐set loss
     test_loss = double(crossentropy(Y_test, T_test_full, DataFormat="BC"));
 
-    plotTrainingMetrics( ...
-    train_losses, val_losses, ...
-    train_accs,   val_accs, ...
-    train_prec, train_rec, train_f1, ...
-    val_prec,   val_rec,   val_f1, ...
-    validationFrequency, seed, ...
-    y_test_cat(:),    Y_test_cls(:), ...
-    testAcc, testPrec, testRec, testF1 );
+    % plotTrainingMetrics( ...
+    % train_losses, val_losses, ...
+    % train_accs,   val_accs, ...
+    % train_prec, train_rec, train_f1, ...
+    % val_prec,   val_rec,   val_f1, ...
+    % validationFrequency, seed, ...
+    % y_test_cat(:),    Y_test_cls(:), ...
+    % testAcc, testPrec, testRec, testF1 );
     
    % Save the model and training logs
     save("models/cora_node_gcn_" + string(seed) + ".mat", ...
