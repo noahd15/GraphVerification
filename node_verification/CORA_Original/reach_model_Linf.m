@@ -5,9 +5,9 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
     adjacencyDataTest = double(adjacencyDataTest);
     featureDataTest   = double(featureDataTest);
 
-    mu  = mean(featureDataTest(:));
-    sigma = std (featureDataTest(:));
-    featureDataTest = (featureDataTest - mu) ./ sigma;
+    % mu  = mean(featureDataTest(:));
+    % sigma = std (featureDataTest(:));
+    % featureDataTest = (featureDataTest - mu) ./ sigma;
 
     load("models/"+modelPath+".mat");
 

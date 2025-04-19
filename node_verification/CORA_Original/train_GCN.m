@@ -8,7 +8,7 @@ if isempty(projectRoot)
 end
 
 data = load(fullfile(projectRoot, 'data', 'cora_node.mat'));
-num_features = 512
+num_features = 32
 
 PCA(data.edge_indices, data.features, data.labels, num_features, 'reduced_dataset.mat');
 data = load('reduced_dataset.mat');
