@@ -8,14 +8,15 @@ if isempty(projectRoot)
 end
 
 data = load(fullfile(projectRoot, 'data', 'cora_node.mat'));
+num_features = 16
 
-PCA(data.edge_indices, data.features, data.labels, 16, 'reduced_dataset.mat');
+PCA(data.edge_indices, data.features, data.labels, num_features, 'reduced_dataset.mat');
 data = load('reduced_dataset.mat');
 
+A_full = data.edge_indices(:,:,1);       % 2708×2708
+X_full = double(data.features(:,:,1));   % 2708×64   <-- your new num_features
+y_full = double(data.labels(:)) + 1;     % 2708×1
 
-A_full   = data.edge_indices(:,:,1);
-X_full   = data.features(:,:,1);
-y_full   = double(data.labels(:)) + 1;
 [numNodes, featureDim] = size(X_full);
 
 rng(2024);
@@ -52,7 +53,7 @@ for i = 1:numel(seeds)
     seed = seeds(i);
     rng(seeds(i));
     parameters = struct;
-    numHiddenFeatureMaps = 32;
+    numHiddenFeatureMaps = num_features * 2;
     validationFrequency = 1;
     fprintf('FeatureDim = %d\n', featureDim);
 

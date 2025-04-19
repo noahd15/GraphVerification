@@ -1,13 +1,13 @@
 function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest)
     % Verification of a Graph Neural Network
-
-
     adjacencyDataTest = reshape(adjacencyDataTest, [size(adjacencyDataTest, 1), size(adjacencyDataTest, 2), 1]);
     featureDataTest = reshape(featureDataTest, [size(featureDataTest, 1), size(featureDataTest, 2), 1]);
+    adjacencyDataTest = double(adjacencyDataTest);
+    featureDataTest   = double(featureDataTest);
 
-    fprintf('adjacencyDataTest size: %d x %d x %d\n', size(adjacencyDataTest, 1), size(adjacencyDataTest, 2), size(adjacencyDataTest, 3));
-    fprintf('featureDataTest size: %d x %d x %d\n', size(featureDataTest, 1), size(featureDataTest, 2), size(featureDataTest, 3));
-
+    mu  = mean(featureDataTest(:));
+    sigma = std (featureDataTest(:));
+    featureDataTest = (featureDataTest - mu) ./ sigma;
 
     load("models/"+modelPath+".mat");
 
@@ -17,7 +17,6 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
 
     N = size(featureDataTest, 3);
     % L_inf size
-    % epsilon = [0.005; 0.01; 0.02; 0.05];
     targets = {};
     outputSets = {};
     rT = {};
@@ -28,15 +27,15 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
 
             [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,i),featureDataTest(:,:,i),labelDataTest(i,:));
 
-            XTest = dlarray(XTest);
+            XTest = dlarray(XTest);     
             Averify = normalizeAdjacency(ATest);
+            
+            whos XTest
 
             lb = extractdata(XTest-epsilon(k));
             ub = extractdata(XTest+epsilon(k));
 
-
             Xverify = ImageStar(lb,ub);
-            % fprintf('Xverify size: %d x %d x %d x %d\n', size(Xverify.V,1), size(Xverify.V,2), size(Xverify.V,3), size(Xverify.V,4));
             x = Xverify.V;
             whos x;
 
@@ -65,17 +64,7 @@ end
 
 function [adjacency, features, labels] = preprocessData(adjacencyData, featureData, labelData)
     [adjacency, features] = preprocessPredictors(adjacencyData, featureData);
-    labels = [];
-    for i = 1:size(adjacencyData, 3)
-        numNodes = find(any(adjacencyData(:,:,i)), 1, "last");
-        if isempty(numNodes)
-            numNodes = 0;
-        end
-
-        % Fix: Use only the first numNodes elements from the i-th row
-        T = labelData(i, 1:min(numNodes, size(labelData,2)));
-        labels = [labels; T(:)];
-    end
+    labels = labelData(:);
 end
 
 function [adjacency, features] = preprocessPredictors(adjacencyData, featureData)
@@ -91,23 +80,11 @@ function [adjacency, features] = preprocessPredictors(adjacencyData, featureData
         A = adjacencyData(1:numNodes, 1:numNodes, i);
         X = featureData(1:numNodes, :, i);
 
-
-
         adjacency = blkdiag(adjacency, A);
 
         % Concatenate feature rows
         features = [features; X];
-
-        if mod(i, 500) == 0
-            fprintf('Processing graph %d\n', i);
-        end
     end
-
-    % adjacency = reshape(adjacency, [size(adjacency, 1), size(adjacency, 2), 1]);
-    % features = reshape(features, [size(features, 1), size(features, 2), 1]);
-
-    % fprintf('Feature dimensions: %d x %d x %d\n', size(features, 1), size(features, 2), size(features, 3));
-    % fprintf('Adjacency dimensions: %d x %d x %d\n', size(adjacency, 1), size(adjacency, 2), size(adjacency, 3));
 end
 
 function ANorm = normalizeAdjacency(A)
@@ -126,29 +103,24 @@ end
 
 function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     Xverify = input;
-    Averify = adjMat; %18 x 18
-    n = size(adjMat,1); %18
+    Averify = adjMat; 
+    n = size(adjMat,1); 
 
     %%%%%%%%  LAYER 1  %%%%%%%%
-    newV = Xverify.V; %18 x 16 x 1 x 289
-    newV = squeeze(Xverify.V); % 18 x 16 x 289
+    newV = Xverify.V; 
+    newV = squeeze(Xverify.V); 
     Averify_full = full(Averify);
-    newV = tensorprod(Averify_full, newV, 2, 1); % 18 x 16 x 289
-    w = extractdata(weights{1}); % 16x32
-    newV = tensorprod(newV, extractdata(weights{1}), 2, 1); %18 x 289 x 32
-    newV = reshape(newV, [size(newV,1), size(newV,2), 1, size(newV,3)]); % 18 x 289 x 1 x 32
-    newV = permute(newV, [1 4 3 2]); % 18 x 32 x 1 x 289
-    X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub); % 18 x 32 x 1 x 289
+    newV = tensorprod(Averify_full, newV, 2, 1); 
+    w = extractdata(weights{1}); 
+    newV = tensorprod(newV, extractdata(weights{1}), 2, 1);
+    newV = reshape(newV, [size(newV,1), size(newV,2), 1, size(newV,3)]); 
+    newV = permute(newV, [1 4 3 2]); 
+    X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub); 
     % part 2 %
-    X2b = L.reach(X2, reachMethod); % 18 x 32 x 1 x 289
-    repV = repmat(Xverify.V,[1,2,1,1]); %18 x 32 x 1 x 289
+    X2b = L.reach(X2, reachMethod);
+    repV = repmat(Xverify.V,[1,2,1,1]); 
     Xrep = ImageStar(repV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
-    v = X2b.V;
-    whos v
-    x = Xrep.V;
-    whos x
     X2b_ = X2b.MinkowskiSum(Xrep);
-    % size(X2b_.V)
 
     %%%%%%%%  LAYER 2  %%%%%%%%
 
@@ -169,6 +141,4 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     newV = tensorprod(newV, extractdata(weights{3}), 2, 1);
     newV = permute(newV, [1 4 2 3]);
     Y = ImageStar(newV, X3b_.C, X3b_.d, X3b_.pred_lb, X3b_.pred_ub);
-
-
 end
