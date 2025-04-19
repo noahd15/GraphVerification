@@ -1,5 +1,21 @@
 projectRoot = getenv('AV_PROJECT_HOME');
 
+nnvRoot     = fullfile('/home/kendra/Code/other/Verification/nnv');
+
+if ~isfolder(nnvRoot)
+    error('NNV folder not found: %s', nnvRoot)
+end
+
+% 3) Add NNV (and all subfolders) to your MATLAB path
+addpath( genpath(nnvRoot) );
+
+% 4) Persist it so you don’t need to re‑add each session
+savepath;
+
+% 5) Verify MATLAB can now see the ImageStar class
+disp( which('ImageStar','-all') );
+
+
 addpath(genpath(fullfile(projectRoot, '/node_verification/functions/')));
 addpath(genpath(fullfile(projectRoot, '/node_verification/models/')));
 

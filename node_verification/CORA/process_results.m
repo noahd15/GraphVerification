@@ -8,8 +8,16 @@
 
 % seeds = [0,1,2,3,4]; % models
 seeds = [1]; % models
-epsilon = [0.005] %; 0.01; 0.02; 0.05];
+epsilon = [0.0005] %; 0.01; 0.02; 0.05];
 eN = length(epsilon);
+
+projectRoot = getenv('AV_PROJECT_HOME');
+baseDir     = fullfile(projectRoot,'node_verification','CORA','verification_results');
+matDir      = fullfile(baseDir, 'mat_files');
+
+% make sure the dirs exist
+if ~exist(matDir,'dir'),    mkdir(matDir);    end
+if ~exist(baseDir,'dir'),   mkdir(baseDir);   end
 
 % Verify one model at a time
 for m=1:length(seeds)
@@ -22,21 +30,29 @@ for m=1:length(seeds)
 
     for k = 1:eN
         % Load data one at a time
-        load("verification_results/mat_files/verified_nodes_"+modelPath+"_eps_"+string(epsilon(k))+".mat"); 
+        epsStr = sprintf('%.4f', epsilon(k));   % -> '0.0005'
 
-        N = length(targets);
-        for i=1:N
-            % get result data
-            res = results{i};
-            rb  = sum(res==1); % robust
-            unk = sum(res==2); % unknown
-            nrb = sum(res==0); % not robust
+        % 2) load the mat-file whose name you actually saved
+        fname = fullfile(matDir, ...
+        sprintf("verification_results_%s_eps_%s.mat", modelPath, epsStr));
+        if ~isfile(fname)
+            error("Cannot find %s", fname);
+        end
+        S = load(fname, 'results','targets');
 
-            % atoms
-            samples(k,1) = samples(k,1) + rb;
-            samples(k,2) = samples(k,2) + unk;
-            samples(k,3) = samples(k,3) + nrb;
-            samples(k,4) = samples(k,4) + length(res);
+        if ~isfile(fname)
+            error("Cannot find %s", fname);
+        end
+        S = load(fname, 'results','targets');
+
+        % 3) tally your results
+        N = numel(S.targets);
+        for i = 1:N
+            r = S.results(i);
+            samples(k,1) = samples(k,1) + sum(r==1);  % robust
+            samples(k,2) = samples(k,2) + sum(r==2);  % unknown
+            samples(k,3) = samples(k,3) + sum(r==0);  % not robust
+            samples(k,4) = samples(k,4) + numel(r);   % total atoms
         end
     end
 

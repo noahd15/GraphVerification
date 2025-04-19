@@ -25,6 +25,7 @@ for m=1:length(seeds)
         load("verification_results/mat_files/verified_nodes_"+modelPath+"_eps_"+string(epsilon(k))+".mat"); 
 
         N = length(targets);
+        disp(N)
         for i=1:N
             % get result data
             res = results{i};

@@ -1,13 +1,13 @@
 function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest)
+    projectRoot = getenv('AV_PROJECT_HOME');
+    matDir = fullfile(projectRoot,'node_verification','CORA', ...
+                      'verification_results','mat_files');
+    if ~exist(matDir,'dir')
+        mkdir(matDir);
+    end
     % Verification of a Graph Neural Network
-    adjacencyDataTest = reshape(adjacencyDataTest, [size(adjacencyDataTest, 1), size(adjacencyDataTest, 2), 1]);
-    featureDataTest = reshape(featureDataTest, [size(featureDataTest, 1), size(featureDataTest, 2), 1]);
     adjacencyDataTest = double(adjacencyDataTest);
     featureDataTest   = double(featureDataTest);
-
-    mu  = mean(featureDataTest(:));
-    sigma = std (featureDataTest(:));
-    featureDataTest = (featureDataTest - mu) ./ sigma;
 
     load("models/"+modelPath+".mat");
 
@@ -15,7 +15,10 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
     w2 = gather(parameters.mult2.Weights);
     w3 = gather(parameters.mult3.Weights);
 
-    N = size(featureDataTest, 3);
+    Averify = normalizeAdjacency(adjacencyDataTest);
+    XTest = dlarray(featureDataTest);     
+    
+    N = size(featureDataTest,1);
     % L_inf size
     targets = {};
     outputSets = {};
@@ -24,39 +27,49 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
     for k = 1:length(epsilon)
 
         for i = 1:N
+            disp("i: ")
+            disp(i)
+            labelsTest = labelDataTest(i);
 
-            [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,i),featureDataTest(:,:,i),labelDataTest(i,:));
-
-            XTest = dlarray(XTest);     
-            Averify = normalizeAdjacency(ATest);
-            
-            whos XTest
-
-            lb = extractdata(XTest-epsilon(k));
-            ub = extractdata(XTest+epsilon(k));
+            lb = extractdata(XTest);
+            ub = extractdata(XTest);
+            lb(i, :) = lb(i, :) - epsilon(k);
+            ub(i, :) = ub(i, :) + epsilon(k);
 
             Xverify = ImageStar(lb,ub);
-            x = Xverify.V;
-            whos x;
-
+            
             t = tic;
 
             reachMethod = 'approx-star';
             L = ReluLayer();
 
-            Y = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, Averify);
-
-            % store results
-            outputSets{i} = Y;
-            targets{i} = labelsTest;
-            rT{i} = toc(t);
+            Ybig = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, Averify);
+            
+            [lb_full, ub_full] = Ybig.getRanges();      
+            C = round(numel(lb_full) / N);             % ensure integer
+            idx = (i-1)*C + (1:C);                     
+            node_lb = lb_full(idx);
+            node_ub = ub_full(idx);
+            
+            % flatten into true vectors
+            node_lb = node_lb(:);
+            node_ub = node_ub(:);
+            
+            % build the per‑node star in R^C
+            Ynode = Star(node_lb, node_ub);
+            
+            % store the sliced star (not the big one)
+            outputSets{i} = Ynode;   
+            targets{i}   = labelsTest;
+            rT{i}        = toc(t);
         end
 
-        if ~exist('results', 'dir')
-            mkdir('results');
-        end
-        
-        save("verification_results/mat_files/verified_nodes_"+modelPath+"_eps_"+string(epsilon(k))+".mat", "outputSets", "targets", "rT", '-v7.3');
+        epsStr = sprintf('%.4f',epsilon(k));
+        fname  = fullfile(matDir, ...
+                 sprintf("verified_nodes_%s_eps_%s.mat", modelPath, epsStr));
+        save(fname, "outputSets","targets","rT","-v7");
+        fprintf("SAVED → %s\n", fname);
+
         disp("SAVED")
 
     end
@@ -120,25 +133,25 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     X2b = L.reach(X2, reachMethod);
     repV = repmat(Xverify.V,[1,2,1,1]); 
     Xrep = ImageStar(repV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
-    X2b_ = X2b.MinkowskiSum(Xrep);
+    % X2b_ = X2b.MinkowskiSum(Xrep);
 
     %%%%%%%%  LAYER 2  %%%%%%%%
 
     % part 1
-    newV = X2b_.V;
+    newV = X2b.V;
     newV = tensorprod(full(Averify), newV, 2, 1);
     newV = tensorprod(newV, extractdata(weights{2}),2,1);
     newV = permute(newV, [1 4 2 3]);
-    X3 = ImageStar(newV, X2b_.C, X2b_.d, X2b_.pred_lb, X2b_.pred_ub);
+    X3 = ImageStar(newV, X2b.C, X2b.d, X2b.pred_lb, X2b.pred_ub);
     % part 2
     X3b = L.reach(X3, reachMethod);
-    X3b_ = X3b.MinkowskiSum(X2b_);
+    % X3b_ = X3b.MinkowskiSum(X2b_);
 
     %%%%%%%%  LAYER 3  %%%%%%%%
 
-    newV = X3b_.V;
+    newV = X3b.V;
     newV = tensorprod(full(Averify), newV, 2, 1);
     newV = tensorprod(newV, extractdata(weights{3}), 2, 1);
     newV = permute(newV, [1 4 2 3]);
-    Y = ImageStar(newV, X3b_.C, X3b_.d, X3b_.pred_lb, X3b_.pred_ub);
+    Y = ImageStar(newV, X3b.C, X3b.d, X3b.pred_lb, X3b.pred_ub);
 end

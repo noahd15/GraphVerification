@@ -1,14 +1,14 @@
 canUseGPU = false;
 
+projectRoot = "/home/kendra/Code/other/Verification/AV_Project" %getenv('AV_PROJECT_HOME');
 addpath(genpath(fullfile(projectRoot, '/node_verification/functions/')));
 
-projectRoot = getenv('AV_PROJECT_HOME');
 if isempty(projectRoot)
     error('Set AV_PROJECT_HOME to your project root.');
 end
 
 data = load(fullfile(projectRoot, 'data', 'cora_node.mat'));
-num_features = 16
+num_features = 32
 
 PCA(data.edge_indices, data.features, data.labels, num_features, 'reduced_dataset.mat');
 data = load('reduced_dataset.mat');
@@ -28,6 +28,8 @@ classNames    = string(1:numClasses);
 y_train_cat   = categorical(y_full(idxTrain), classes, classNames);
 y_val_cat     = categorical(y_full(idxValidation), classes, classNames);
 y_test_cat    = categorical(y_full(idxTest), classes, classNames);
+
+dropoutRate = 0.5;  % typical value
 
 counts       = countcats(y_train_cat);
 classWeights = (1 ./ counts) ./ sum(1./counts) * numel(classes);
@@ -87,7 +89,8 @@ for i = 1:numel(seeds)
     %% Full‑Batch Training Loop
     for epoch = 1:numEpochs
         % Compute loss & gradients on entire training set
-        [loss, gradients] = dlfeval(@modelLoss, parameters, X_train_full, A_train_full, T_train_full, classWeights);
+        [loss, gradients] = dlfeval(@modelLoss, parameters, X_train_full, A_train_full, T_train_full, classWeights, 0.5, true);
+
 
         % Update parameters
         [parameters, trailingAvg, trailingAvgSq] = ...
@@ -97,7 +100,7 @@ for i = 1:numel(seeds)
         train_losses(epoch) = double(loss);
 
         % --- Metrics on train set ---
-        Y_train       = model(parameters, X_train_full, A_train_full);
+        Y_train = model(parameters, X_train_full, A_train_full, dropoutRate, true);
         Y_train_cls   = onehotdecode(Y_train, string(classes), 2);
         train_accs(epoch) = mean(Y_train_cls == y_train_cat);
         [p, r, f]     = calculatePrecisionRecall(Y_train_cls, y_train_cat);
@@ -111,7 +114,7 @@ for i = 1:numel(seeds)
             % Move your validation block inside here:
             X_val_full = dlarray(X_full(idxValidation, :));
             if canUseGPU, X_val_full = gpuArray(X_val_full); end
-            Y_val     = model(parameters, X_val_full, A_val_full);
+            Y_val = model(parameters, X_val_full, A_val_full, 0.5, false);
             Y_val_cls = onehotdecode(Y_val, string(classes), 2);
             val_accs(epoch)   = mean(Y_val_cls == y_val_cat);
             val_losses(epoch) = double(crossentropy(Y_val, T_val_full, DataFormat="BC"));
@@ -131,7 +134,7 @@ for i = 1:numel(seeds)
     T_test_full = onehotencode(y_test_cat, 2, 'ClassNames', string(classes));
     if canUseGPU, X_test_full = gpuArray(X_test_full); end
 
-    Y_test     = model(parameters, X_test_full, A_test_full);
+    Y_test = model(parameters, X_test_full, A_test_full, 0.5, false);
     Y_test_cls = onehotdecode(Y_test, string(classes), 2);
     testAcc    = mean(Y_test_cls == y_test_cat);
     [pt, rt, ft] = calculatePrecisionRecall(Y_test_cls, y_test_cat);
@@ -153,28 +156,18 @@ for i = 1:numel(seeds)
         fprintf('%-10s %-10.4f %-10.4f %-10.4f\n', ...
             classNames(j), pt(j), rt(j), ft(j));
     end
-
-    %% Final Test (after your epoch loop)
-    Y_test     = model(parameters, X_test_full, A_test_full);
-    Y_test_cls = onehotdecode(Y_test, string(classes), 2);
-    testAcc    = mean(Y_test_cls == y_test_cat);
-    [pt, rt, ft] = calculatePrecisionRecall(Y_test_cls, y_test_cat);
-
-    testPrec = pt(end);
-    testRec    = rt(end);
-    testF1        = ft(end);
     
     % Scalar test‐set loss
     test_loss = double(crossentropy(Y_test, T_test_full, DataFormat="BC"));
 
-    % plotTrainingMetrics( ...
-    % train_losses, val_losses, ...
-    % train_accs,   val_accs, ...
-    % train_prec, train_rec, train_f1, ...
-    % val_prec,   val_rec,   val_f1, ...
-    % validationFrequency, seed, ...
-    % y_test_cat(:),    Y_test_cls(:), ...
-    % testAcc, testPrec, testRec, testF1 );
+    plotTrainingMetrics( ...
+    train_losses, val_losses, ...
+    train_accs,   val_accs, ...
+    train_prec, train_rec, train_f1, ...
+    val_prec,   val_rec,   val_f1, ...
+    validationFrequency, seed, ...
+    y_test_cat(:),    Y_test_cls(:), ...
+    testAcc, testPrec, testRec, testF1 );
     
    % Save the model and training logs
     save("models/cora_node_gcn_" + string(seed) + ".mat", ...
@@ -192,37 +185,29 @@ for i = 1:numel(seeds)
     fprintf(' Test F1 Score : %.4f\n', ft(end));
 end
 
-function Y = model(parameters, X, A)
+function Y = model(parameters, X, A, dropoutRate, isTraining)
     ANorm = normalizeAdjacency(A);
     conv1 = ANorm * X * parameters.mult1.Weights;
     relu1 = relu(conv1);
+    if isTraining
+        relu1 = dropout(relu1, dropoutRate);
+    end
     conv2 = ANorm * relu1 * parameters.mult2.Weights;
     relu2 = relu(conv2);
+    if isTraining
+        relu2 = dropout(relu2, dropoutRate);
+    end
     conv3 = ANorm * relu2 * parameters.mult3.Weights;
     Y = softmax(conv3, DataFormat="BC");
 end
 
-function [loss, gradients] = modelLoss(parameters, X, A, T, classWeights)
-    % Ensure parameters are dlarray
-    if ~isa(parameters.mult1.Weights, 'dlarray')
-        parameters.mult1.Weights = dlarray(parameters.mult1.Weights);
-        parameters.mult2.Weights = dlarray(parameters.mult2.Weights);
-        parameters.mult3.Weights = dlarray(parameters.mult3.Weights);
-    end
 
-    % Forward pass
-    Y = model(parameters, X, A);
-
-    % --- FIX: Use WeightsFormat = 'C' for a 1×numClasses weight vector ---
-    loss = crossentropy( ...
-        Y, T, classWeights, ...
-        DataFormat="BC", ...
-        WeightsFormat="C" ...    % <-- was 'UC', now 'C'
-    );
-
-    % Backward pass
+function [loss, gradients] = modelLoss(parameters, X, A, T, classWeights, dropoutRate, isTraining)
+    Y = model(parameters, X, A, dropoutRate, isTraining);
+    loss = crossentropy(Y, T, classWeights, DataFormat="BC", WeightsFormat="C");
     gradients = dlgradient(loss, parameters);
 end
+
 
 
 function ANorm = normalizeAdjacency(A)
@@ -237,6 +222,20 @@ function ANorm = normalizeAdjacency(A)
     D = spdiags(d.^(-0.5), 0, size(A,1), size(A,1));
     ANorm = D * A * D;
 end
+
+function out = dropout(X, rate)
+    if rate == 0
+        out = X;
+        return;
+    end
+    if isa(X, 'gpuArray')
+        mask = gpuArray.rand(size(X)) > rate;
+    else
+        mask = rand(size(X)) > rate;
+    end
+    out = X .* mask / (1 - rate);  
+end
+
 
 function weights = initializeGlorot(sz, fanOut, fanIn, dataType)
     % Initialize weights using Glorot initialization
