@@ -10,7 +10,6 @@ end
 % 3) Add NNV (and all subfolders) to your MATLAB path
 addpath( genpath(nnvRoot) );
 
-% 4) Persist it so you don’t need to re‑add each session
 savepath;
 
 addpath(genpath(fullfile(projectRoot, '/node_verification/functions/')));
