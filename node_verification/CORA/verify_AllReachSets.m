@@ -1,8 +1,7 @@
 % verify_AllReachSets.m
 
-projectRoot = '/home/kendra/Code/other/Verification/AV_Project';
-matDir      = fullfile(projectRoot, 'node_verification','CORA', ...
-                       'verification_results','mat_files');
+projectRoot = getenv('AV_PROJECT_HOME');
+matDir = fullfile(projectRoot, 'node_verification','CORA', verification_results','mat_files');
 
 epsilon = [0.0005];
 seeds   = [1];
@@ -15,14 +14,12 @@ for m = 1:numel(seeds)
     inFile = fullfile(matDir, sprintf( ...
              "verified_nodes_%s_eps_%s.mat", modelPath, epsStr));
 
-    % --- load once, outside the parfor ---
     S = load(inFile, "outputSets", "targets", "rT");
     N = numel(S.outputSets);
 
     % Preallocate
     results = zeros(N,1);
 
-    % --- parallelize only the per‐node verification ---
     parfor i = 1:N
       Ynode     = S.outputSets{i};    % Star in R^C
       trueLabel = S.targets{i};       % scalar in 1…C

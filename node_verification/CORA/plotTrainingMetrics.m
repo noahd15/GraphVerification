@@ -5,15 +5,12 @@ function plotTrainingMetrics(train_losses, val_losses, ...
     validationFrequency, seed, trueLabels, predLabels, ...
     testAcc, testPrecision, testRecall, testF1)
 
-% PLOTTRAININGMETRICS  Plot and save training & validation curves, plus final comparison and confusion matrix
-%   test metrics are single values, shown only in the final bar chart.
-
 % Get project root for saving plots
 projectRoot = getenv('AV_PROJECT_HOME');
 if isempty(projectRoot)
     projectRoot = pwd;
 end
-resultsDir = fullfile(projectRoot, 'node_verification/Cora/train_results');
+resultsDir = fullfile(projectRoot, 'node_verification/CORA/train_results');
 if ~exist(resultsDir, 'dir')
     mkdir(resultsDir);
 end

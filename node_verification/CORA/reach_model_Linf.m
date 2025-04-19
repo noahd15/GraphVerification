@@ -46,7 +46,7 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
             Ybig = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, Averify);
             
             [lb_full, ub_full] = Ybig.getRanges();      
-            C = round(numel(lb_full) / N);             % ensure integer
+            C = round(numel(lb_full) / N);             
             idx = (i-1)*C + (1:C);                     
             node_lb = lb_full(idx);
             node_ub = ub_full(idx);

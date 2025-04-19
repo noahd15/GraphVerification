@@ -1,6 +1,7 @@
 projectRoot = getenv('AV_PROJECT_HOME');
+nnvRoot = getenv('NNV_ROOT');
 
-nnvRoot     = fullfile('/home/kendra/Code/other/Verification/nnv');
+nnvRoot = fullfile(nnvRoot);
 
 if ~isfolder(nnvRoot)
     error('NNV folder not found: %s', nnvRoot)

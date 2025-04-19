@@ -1,6 +1,6 @@
 canUseGPU = false;
 
-projectRoot = "/home/kendra/Code/other/Verification/AV_Project" %getenv('AV_PROJECT_HOME');
+projectRoot = getenv('AV_PROJECT_HOME');
 addpath(genpath(fullfile(projectRoot, '/node_verification/functions/')));
 
 if isempty(projectRoot)
@@ -14,7 +14,7 @@ PCA(data.edge_indices, data.features, data.labels, num_features, 'reduced_datase
 data = load('reduced_dataset.mat');
 
 A_full = data.edge_indices(:,:,1);       % 2708×2708
-X_full = double(data.features(:,:,1));   % 2708×64   <-- your new num_features
+X_full = double(data.features(:,:,1));   % 2708×64   
 y_full = double(data.labels(:)) + 1;     % 2708×1
 
 [numNodes, featureDim] = size(X_full);
@@ -45,7 +45,7 @@ A_val_full = A_full(idxValidation, idxValidation);
 T_val_full = onehotencode( y_val_cat, 2, 'ClassNames', string(classes) );
 if canUseGPU
     X_val_full = gpuArray(X_val_full);
-    A_val_full = gpuArray(A_val_full);   % only if A is small dense array, otherwise leave sparse
+    A_val_full = gpuArray(A_val_full);   
     T_val_full = gpuArray(T_val_full);
 end
 
@@ -110,8 +110,6 @@ for i = 1:numel(seeds)
 
 
         if mod(epoch, validationFrequency)==0
-    
-            % Move your validation block inside here:
             X_val_full = dlarray(X_full(idxValidation, :));
             if canUseGPU, X_val_full = gpuArray(X_val_full); end
             Y_val = model(parameters, X_val_full, A_val_full, 0.5, false);
@@ -242,9 +240,6 @@ end
 
 
 function weights = initializeGlorot(sz, fanOut, fanIn, dataType)
-    % Initialize weights using Glorot initialization
-    % This helps with training deep networks by keeping the variance of activations
-    % roughly the same across layers
     stddev = sqrt(2 / (fanIn + fanOut));
     weights = stddev * randn(sz, dataType);
 end

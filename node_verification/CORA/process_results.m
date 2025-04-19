@@ -12,8 +12,8 @@ epsilon = [0.0005] %; 0.01; 0.02; 0.05];
 eN = length(epsilon);
 
 projectRoot = getenv('AV_PROJECT_HOME');
-baseDir     = fullfile(projectRoot,'node_verification','CORA','verification_results');
-matDir      = fullfile(baseDir, 'mat_files');
+baseDir = fullfile(projectRoot,'node_verification','CORA','verification_results');
+matDir = fullfile(baseDir, 'mat_files');
 
 % make sure the dirs exist
 if ~exist(matDir,'dir'),    mkdir(matDir);    end
@@ -32,7 +32,6 @@ for m=1:length(seeds)
         % Load data one at a time
         epsStr = sprintf('%.4f', epsilon(k));   % -> '0.0005'
 
-        % 2) load the mat-file whose name you actually saved
         fname = fullfile(matDir, ...
         sprintf("verification_results_%s_eps_%s.mat", modelPath, epsStr));
         if ~isfile(fname)
