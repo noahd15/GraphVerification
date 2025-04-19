@@ -1,13 +1,79 @@
+% function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest)
+%     % Verification of a Graph Neural Network
+%     adjacencyDataTest = reshape(adjacencyDataTest, [size(adjacencyDataTest, 1), size(adjacencyDataTest, 2), 1]);
+%     featureDataTest = reshape(featureDataTest, [size(featureDataTest, 1), size(featureDataTest, 2), 1]);
+%     adjacencyDataTest = double(adjacencyDataTest);
+%     featureDataTest   = double(featureDataTest);
+
+%     % mu  = mean(featureDataTest(:));
+%     % sigma = std (featureDataTest(:));
+%     % featureDataTest = (featureDataTest - mu) ./ sigma;
+
+%     load("models/"+modelPath+".mat");
+
+%     w1 = gather(parameters.mult1.Weights);
+%     w2 = gather(parameters.mult2.Weights);
+%     w3 = gather(parameters.mult3.Weights);
+
+%     N = size(featureDataTest, 3);
+%     % L_inf size
+%     targets = {};
+%     outputSets = {};
+%     results = {};
+
+%     for k = 1:length(epsilon)
+
+%         for i = 1:N
+
+%             [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,i),featureDataTest(:,:,i),labelDataTest(i,:));
+
+%             XTest = dlarray(XTest);     
+%             Averify = normalizeAdjacency(ATest);
+            
+%             whos XTest
+
+%             lb = extractdata(XTest-epsilon(k));
+%             ub = extractdata(XTest+epsilon(k));
+
+%             Xverify = ImageStar(lb,ub);
+%             x = Xverify.V;
+%             whos x;
+
+%             t = tic;
+
+%             reachMethod = 'approx-star';
+%             L = ReluLayer();
+
+%             Y_all = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, Averify);
+
+%             numNodes = size(Y_all.V, 1);  % should be # nodes = 272
+%             for j = 1:numNodes
+%                 matIdx = zeros(1, numNodes);
+%                 matIdx(j) = 1;
+%                 Y_j = Y_all.affineMap(matIdx, []); 
+%                 outputSets{(i-1)*numNodes + j} = Y_j;
+%                 targets{(i-1)*numNodes + j} = labelDataTest(j); 
+%                 results{(i-1)*numNodes + j} = toc(t);
+%             end
+
+%         end
+
+%         if ~exist('results', 'dir')
+%             mkdir('results');
+%         end
+        
+%         save("verification_results/mat_files/verified_nodes_"+modelPath+"_eps_"+string(epsilon(k))+".mat", "outputSets", "targets", "rT", '-v7.3');
+%         disp("SAVED")
+
+%     end
+% end
+
 function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest)
-    % Verification of a Graph Neural Network
+    % Setup
     adjacencyDataTest = reshape(adjacencyDataTest, [size(adjacencyDataTest, 1), size(adjacencyDataTest, 2), 1]);
-    featureDataTest = reshape(featureDataTest, [size(featureDataTest, 1), size(featureDataTest, 2), 1]);
+    featureDataTest   = reshape(featureDataTest, [size(featureDataTest, 1), size(featureDataTest, 2), 1]);
     adjacencyDataTest = double(adjacencyDataTest);
     featureDataTest   = double(featureDataTest);
-
-    % mu  = mean(featureDataTest(:));
-    % sigma = std (featureDataTest(:));
-    % featureDataTest = (featureDataTest - mu) ./ sigma;
 
     load("models/"+modelPath+".mat");
 
@@ -16,67 +82,51 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
     w3 = gather(parameters.mult3.Weights);
 
     N = size(featureDataTest, 3);
-    % L_inf size
-    targets = {};
-    outputSets = {};
-    rT = {};
+    reachMethod = 'approx-star';
+    L = ReluLayer();
 
     for k = 1:length(epsilon)
+        results    = {};
+        outputSets = {};
+        targets    = {};
+        rT         = {};
 
         for i = 1:N
-
-            [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,i),featureDataTest(:,:,i),labelDataTest(i,:));
-
-            XTest = dlarray(XTest);     
+            [ATest, XTest, labelsTest] = preprocessData(adjacencyDataTest(:,:,i), featureDataTest(:,:,i), labelDataTest(i,:));
             Averify = normalizeAdjacency(ATest);
-            
-            whos XTest
+            XTest = dlarray(XTest);
 
-            lb = extractdata(XTest-epsilon(k));
-            ub = extractdata(XTest+epsilon(k));
+            % Construct input set
+            lb = extractdata(XTest - epsilon(k));
+            ub = extractdata(XTest + epsilon(k));
+            Xverify = ImageStar(lb, ub);
 
-            Xverify = ImageStar(lb,ub);
-            x = Xverify.V;
-            whos x;
-
+            % Reachability
             t = tic;
+            Y_all = computeReachability({w1, w2, w3}, L, reachMethod, Xverify, Averify);
+            elapsedTime = toc(t);
 
-            reachMethod = 'approx-star';
-            L = ReluLayer();
-
-            % Y = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, Averify);
-
-            % store results
-            % outputSets{i} = Y;
-            % targets{i} = labelsTest;
-            % rT{i} = toc(t);
-
-            Y_all = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, Averify);
-
-            numNodes = size(Y_all.V, 1);  % should be # nodes = 272
-            
+            numNodes = size(Y_all.V, 1);
             for j = 1:numNodes
-                % Project to output of node j
-                matIdx = zeros(1, numNodes);
-                matIdx(j) = 1;
-                Y_j = Y_all.affineMap(matIdx, []); 
-            
+                matIdx = zeros(1, numNodes); matIdx(j) = 1;
+                Y_j = Y_all.affineMap(matIdx, []);
+
                 outputSets{(i-1)*numNodes + j} = Y_j;
-                targets{(i-1)*numNodes + j} = labelDataTest(j);  % label of node j
-                rT{(i-1)*numNodes + j} = toc(t);
+                targets{(i-1)*numNodes + j}    = labelDataTest(j);
+                rT{(i-1)*numNodes + j}         = elapsedTime;
+
+                % Verify immediately
+                results{(i-1)*numNodes + j} = verifyAtom(Y_j, labelDataTest(j));
             end
-
         end
 
-        if ~exist('results', 'dir')
-            mkdir('results');
-        end
-        
-        save("verification_results/mat_files/verified_nodes_"+modelPath+"_eps_"+string(epsilon(k))+".mat", "outputSets", "targets", "rT", '-v7.3');
-        disp("SAVED")
-
+        % Save everything at once (smaller since verification done)
+        save("verification_results/mat_files/verified_nodes_"+modelPath+"_eps_"+string(epsilon(k))+".mat", ...
+    "results", "rT", "targets", "-v7.3");
+        disp("DONE: "+modelPath+", eps="+epsilon(k));
     end
 end
+
 
 function [adjacency, features, labels] = preprocessData(adjacencyData, featureData, labelData)
     [adjacency, features] = preprocessPredictors(adjacencyData, featureData);
@@ -157,4 +207,54 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     newV = tensorprod(newV, extractdata(weights{3}), 2, 1);
     newV = permute(newV, [1 4 2 3]);
     Y = ImageStar(newV, X3b_.C, X3b_.d, X3b_.pred_lb, X3b_.pred_ub);
+end
+
+function result = verifyAtom(X, target)
+    % X is a 7D Star set (output scores for one node)
+    atomHs = label2Hs(target);
+
+    res = verify_specification(X, atomHs);
+
+    if res == 2
+        res = checkViolated(X, target);
+    end
+
+    result = res;
+end
+
+function res = checkViolated(Set, label)
+    res = 5; % assume unknown (property is not unsat, try to sat)
+    target = label;
+    % Get bounds for every index
+    [lb,ub] = Set.getRanges;
+    maxTarget = ub(target);
+    % max value of the target index smaller than any other lower bound?
+    if any(lb > maxTarget)
+        res = 0; % falsified
+    end
+end
+
+function Hs = label2Hs(label)
+    % Convert output target to halfspace for verification
+    % @Hs: unsafe/not robust region defined as a HalfSpace
+
+    outSize = 7; % num of classes
+    % classes = ["H";"C";"N";"O";"S"];
+    target = label;
+
+    % Define HalfSpace Matrix and vector
+    G = ones(outSize,1);
+    G = diag(G);
+    G(target, :) = [];
+    G = -G;
+    G(:, target) = 1;
+
+    g = zeros(size(G,1),1);
+
+    % Create HalfSapce to define robustness specification
+    Hs = [];
+    for i=1:length(g)
+        Hs = [Hs; HalfSpace(G(i,:), g(i))];
+    end
+
 end
