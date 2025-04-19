@@ -12,20 +12,19 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, coulombDataTest
     %% Start for loop for verification here, preprocess one molecule at a time
     
     N = size(coulombDataTest, 3);
-    % L_inf size
-    % epsilon = [0.005; 0.01; 0.02; 0.05];
-    % Store resuts
     targets = {};
     outputSets = {};
     rT = {};
-    
+    disp(N)
+    whos adjacencyDataTest
+    whos coulombDataTest
+    whos atomDataTest
     for k = 1:length(epsilon)
     
         for i = 1:N
 
             % Get molecule data
-            [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,i),coulombDataTest(:,:,i),atomDataTest(i,:));
-
+            [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,N),coulombDataTest(:,:,N),atomDataTest(N,:));
             % normalize data
             XTest = (XTest - muX)./sqrt(sigsqX);
             XTest = dlarray(XTest);     

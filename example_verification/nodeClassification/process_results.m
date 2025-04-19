@@ -36,6 +36,10 @@ for m=1:length(seeds)
             rb  = sum(res==1); % robust
             unk = sum(res==2); % unknown
             nrb = sum(res==0); % not robust
+            disp("res: ")
+            disp(res)
+            disp("n: ")
+            disp(n)
             
             % molecules
             if rb == n

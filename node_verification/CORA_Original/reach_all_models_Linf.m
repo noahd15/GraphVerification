@@ -10,7 +10,7 @@ end
 % 3) Add NNV (and all subfolders) to your MATLAB path
 addpath( genpath(nnvRoot) );
 
-savepath;
+% savepath;
 
 addpath(genpath(fullfile(projectRoot, '/node_verification/functions/')));
 addpath(genpath(fullfile(projectRoot, '/node_verification/models/')));
@@ -37,7 +37,7 @@ fprintf('Feature dimension: %d\n', size(featureDataTest, 2));
 % Study Variables
 % seeds = [0,1,2,3,4]; % models
 seeds = [1]; % models
-epsilon = [0.0005]; % attack
+epsilon = [0.1]; % attack
 
 % Verify one model at a time - using regular for loop instead of parfor to avoid file access issues
 for k = 1:length(seeds)

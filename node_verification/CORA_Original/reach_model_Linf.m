@@ -44,12 +44,28 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
             reachMethod = 'approx-star';
             L = ReluLayer();
 
-            Y = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, Averify);
+            % Y = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, Averify);
 
             % store results
-            outputSets{i} = Y;
-            targets{i} = labelsTest;
-            rT{i} = toc(t);
+            % outputSets{i} = Y;
+            % targets{i} = labelsTest;
+            % rT{i} = toc(t);
+
+            Y_all = computeReachability({w1,w2,w3}, L, reachMethod, Xverify, Averify);
+
+            numNodes = size(Y_all.V, 1);  % should be # nodes = 272
+            
+            for j = 1:numNodes
+                % Project to output of node j
+                matIdx = zeros(1, numNodes);
+                matIdx(j) = 1;
+                Y_j = Y_all.affineMap(matIdx, []); 
+            
+                outputSets{(i-1)*numNodes + j} = Y_j;
+                targets{(i-1)*numNodes + j} = labelDataTest(j);  % label of node j
+                rT{(i-1)*numNodes + j} = toc(t);
+            end
+
         end
 
         if ~exist('results', 'dir')
