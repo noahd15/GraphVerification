@@ -34,7 +34,11 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
             lb = extractdata(XTest-epsilon(k));
             ub = extractdata(XTest+epsilon(k));
 
+
             Xverify = ImageStar(lb,ub);
+            % fprintf('Xverify size: %d x %d x %d x %d\n', size(Xverify.V,1), size(Xverify.V,2), size(Xverify.V,3), size(Xverify.V,4));
+            x = Xverify.V;
+            whos x;
 
             t = tic;
 
@@ -134,32 +138,34 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     newV = tensorprod(Averify_full, newV, 2, 1); % 18 x 16 x 289
     w = extractdata(weights{1}); % 16x32
     newV = tensorprod(newV, extractdata(weights{1}), 2, 1); %18 x 289 x 32
-    fprintf('newV size: %d x %d x %d\n', size(newV,1), size(newV,2), size(newV,3));
+    % fprintf('newV size: %d x %d x %d\n', size(newV,1), size(newV,2), size(newV,3));
     newV = reshape(newV, [size(newV,1), size(newV,2), 1, size(newV,3)]); % 18 x 289 x 1 x 32
     newV = permute(newV, [1 4 3 2]); % 18 x 32 x 1 x 289
     X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub); % 18 x 32 x 1 x 289
+
     % part 2 %
     X2b = L.reach(X2, reachMethod); % 18 x 32 x 1 x 289
     repV = repmat(Xverify.V,[1,2,1,1]); %18 x 32 x 1 x 289
     Xrep = ImageStar(repV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
-    % X2b_ = X2b.MinkowskiSum(Xrep);
+    % fprintf('Xrep size: %d x %d x %d x %d\n', size(Xrep.V,1), size(Xrep.V,2), size(Xrep.V,3), size(Xrep.V,4));
+    X2b_ = X2b.MinkowskiSum(Xrep);
     % size(X2b_.V)
 
     %%%%%%%%  LAYER 2  %%%%%%%%
 
     % part 1
-    newV = X2b.V;
+    newV = X2b_.V;
     newV = tensorprod(full(Averify), newV, 2, 1);
     newV = tensorprod(newV, extractdata(weights{2}),2,1);
     newV = permute(newV, [1 4 2 3]);
     X3 = ImageStar(newV, X2b.C, X2b.d, X2b.pred_lb, X2b.pred_ub);
     % part 2
     X3b = L.reach(X3, reachMethod);
-    % X3b_ = X3b.MinkowskiSum(X2b_);
+    X3b_ = X3b.MinkowskiSum(X2b_);
 
     %%%%%%%%  LAYER 3  %%%%%%%%
 
-    newV = X3b.V;
+    newV = X3b_.V;
     newV = tensorprod(full(Averify), newV, 2, 1);
     newV = tensorprod(newV, extractdata(weights{3}), 2, 1);
     newV = permute(newV, [1 4 2 3]);

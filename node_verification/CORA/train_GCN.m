@@ -8,6 +8,11 @@ if isempty(projectRoot)
 end
 
 data = load(fullfile(projectRoot, 'data', 'cora_node.mat'));
+
+PCA(data.edge_indices, data.features, data.labels, 16, 'reduced_dataset.mat');
+data = load('reduced_dataset.mat');
+
+
 A_full   = data.edge_indices(:,:,1);
 X_full   = data.features(:,:,1);
 y_full   = double(data.labels(:)) + 1;
@@ -16,7 +21,17 @@ y_full   = double(data.labels(:)) + 1;
 rng(2024);
 [idxTrain, idxValidation, idxTest] = trainingPartitions(numNodes, [0.8 0.1 0.1]);
 
-%% Prepare full‑batch data once
+classes       = unique(y_full);
+numClasses    = numel(classes);
+classNames    = string(1:numClasses);
+y_train_cat   = categorical(y_full(idxTrain), classes, classNames);
+y_val_cat     = categorical(y_full(idxValidation), classes, classNames);
+y_test_cat    = categorical(y_full(idxTest), classes, classNames);
+
+counts       = countcats(y_train_cat);
+classWeights = (1 ./ counts) ./ sum(1./counts) * numel(classes);
+
+% Prepare full‑batch data once
 X_train_full = dlarray(X_full(idxTrain, :));
 A_train_full = A_full(idxTrain, idxTrain);
 T_train_full = onehotencode(y_train_cat, 2, 'ClassNames', string(classes));
@@ -30,16 +45,6 @@ if canUseGPU
     A_val_full = gpuArray(A_val_full);   % only if A is small dense array, otherwise leave sparse
     T_val_full = gpuArray(T_val_full);
 end
-
-classes       = unique(y_full);
-numClasses    = numel(classes);
-classNames    = string(1:numClasses);
-y_train_cat   = categorical(y_full(idxTrain), classes, classNames);
-y_val_cat     = categorical(y_full(idxValidation), classes, classNames);
-y_test_cat    = categorical(y_full(idxTest), classes, classNames);
-
-counts       = countcats(y_train_cat);
-classWeights = (1 ./ counts) ./ sum(1./counts) * numel(classes);
 
 %% Network Initialization
 seeds = [1];
@@ -161,14 +166,14 @@ for i = 1:numel(seeds)
     % Scalar test‐set loss
     test_loss = double(crossentropy(Y_test, T_test_full, DataFormat="BC"));
 
-    plotTrainingMetrics( ...
-    train_losses, val_losses, ...
-    train_accs,   val_accs, ...
-    train_prec, train_rec, train_f1, ...
-    val_prec,   val_rec,   val_f1, ...
-    validationFrequency, seed, ...
-    y_test_cat(:),    Y_test_cls(:), ...
-    testAcc, testPrec, testRec, testF1 );
+    % plotTrainingMetrics( ...
+    % train_losses, val_losses, ...
+    % train_accs,   val_accs, ...
+    % train_prec, train_rec, train_f1, ...
+    % val_prec,   val_rec,   val_f1, ...
+    % validationFrequency, seed, ...
+    % y_test_cat(:),    Y_test_cls(:), ...
+    % testAcc, testPrec, testRec, testF1 );
     
    % Save the model and training logs
     save("models/cora_node_gcn_" + string(seed) + ".mat", ...

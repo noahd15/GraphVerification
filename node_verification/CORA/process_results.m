@@ -8,7 +8,7 @@
 
 % seeds = [0,1,2,3,4]; % models
 seeds = [1]; % models
-epsilon = [0.000005] %; 0.01; 0.02; 0.05];
+epsilon = [0.005] %; 0.01; 0.02; 0.05];
 eN = length(epsilon);
 
 % Verify one model at a time
@@ -50,7 +50,7 @@ for m=1:length(seeds)
     fprintf(fileID, 'Summary of robustness results of CORA gnn model with accuracy = %.4f \n\n', model.testAcc);
     fprintf(fileID,'                 Compromised \n');
     fprintf(fileID, 'Epsilon | Robust  Unknown  Not Rob.  N \n');
-    fprintf(fileID, '  0.000005 | %.3f    %.3f   %.3f   %d \n', samples(1,1)/samples(1,4), samples(1,2)/samples(1,4), samples(1,3)/samples(1,4), samples(1,4));
+    fprintf(fileID, '  0.005 | %.3f    %.3f   %.3f   %d \n', samples(1,1)/samples(1,4), samples(1,2)/samples(1,4), samples(1,3)/samples(1,4), samples(1,4));
     % fprintf(fileID, '   0.01 | %.3f    %.3f   %.3f   %d \n', samples(2,1)/samples(2,4), samples(2,2)/samples(2,4), samples(2,3)/samples(2,4), samples(2,4));
     % fprintf(fileID, '   0.02 | %.3f    %.3f   %.3f   %d \n', samples(3,1)/samples(3,4), samples(3,2)/samples(3,4), samples(3,3)/samples(3,4), samples(3,4));
     % fprintf(fileID, '   0.05 | %.3f    %.3f   %.3f   %d \n', samples(4,1)/samples(4,4), samples(4,2)/samples(4,4), samples(4,3)/samples(4,4), samples(4,4));

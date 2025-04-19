@@ -4,7 +4,9 @@ addpath(genpath(fullfile(projectRoot, '/node_verification/functions/')));
 addpath(genpath(fullfile(projectRoot, '/node_verification/models/')));
 
 
-data = load(fullfile(projectRoot, 'data', 'cora_node.mat'));
+
+% data = load(fullfile(projectRoot, 'data', 'cora_node.mat'));
+data = load(fullfile(projectRoot, 'node_verification', 'CORA', 'reduced_dataset.mat'));
 A_full     = data.edge_indices(:,:,1);    
 X_full     = data.features(:,:,1);        
 y_full     = double(data.labels(:)) + 1;  
