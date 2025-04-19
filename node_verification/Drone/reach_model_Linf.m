@@ -22,14 +22,17 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
 
             [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,i),featureDataTest(:,:,i),labelDataTest(i,:));
 
-            XTest = dlarray(XTest);
-            Averify = normalizeAdjacency(ATest);
+            XTest = dlarray(XTest);  %18x16     
+            Averify = normalizeAdjacency(ATest); %18x18
 
-            lb = extractdata(XTest-epsilon(k));
-            ub = extractdata(XTest+epsilon(k));
+            disp(XTest
 
-            Xverify = ImageStar(lb,ub);
-
+            lb = extractdata(XTest-epsilon(k)); %18x16
+            ub = extractdata(XTest+epsilon(k)); %18x16
+            
+            Xverify = ImageStar(lb,ub); %18x16x1x289  
+            x = Xverify.V; 
+            whos x
             t = tic;
 
             reachMethod = 'approx-star';
@@ -110,8 +113,6 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     n = size(adjMat,1); %18
 
     %%%%%%%%  LAYER 1  %%%%%%%%
-
-    % part 1
     newV = Xverify.V; %18 x 16 x 1 x 289
     newV = squeeze(Xverify.V); % 18 x 16 x 289
     Averify_full = full(Averify);
@@ -125,41 +126,32 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     X2b = L.reach(X2, reachMethod); % 18 x 32 x 1 x 289
     repV = repmat(Xverify.V,[1,2,1,1]); %18 x 32 x 1 x 289
     Xrep = ImageStar(repV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
-    % X2b_ = X2b.MinkowskiSum(Xrep);
+    v = X2b.V;
+    whos v
+    x = Xrep.V;
+    whos x
+    X2b_ = X2b.MinkowskiSum(Xrep);
     % size(X2b_.V)
 
     %%%%%%%%  LAYER 2  %%%%%%%%
 
     % part 1
-    newV = X2b.V;
+    newV = X2b_.V;
     newV = tensorprod(full(Averify), newV, 2, 1);
     newV = tensorprod(newV, extractdata(weights{2}),2,1);
     newV = permute(newV, [1 4 2 3]);
-    X3 = ImageStar(newV, X2b.C, X2b.d, X2b.pred_lb, X2b.pred_ub);
+    X3 = ImageStar(newV, X2b_.C, X2b_.d, X2b_.pred_lb, X2b_.pred_ub);
     % part 2
     X3b = L.reach(X3, reachMethod);
-    % X3b_ = X3b.MinkowskiSum(X2b_);
+    X3b_ = X3b.MinkowskiSum(X2b_);
 
     %%%%%%%%  LAYER 3  %%%%%%%%
 
-    newV = X3b.V;
+    newV = X3b_.V;
     newV = tensorprod(full(Averify), newV, 2, 1);
     newV = tensorprod(newV, extractdata(weights{3}), 2, 1);
     newV = permute(newV, [1 4 2 3]);
-    Y = ImageStar(newV, X3b.C, X3b.d, X3b.pred_lb, X3b.pred_ub);
-
-     %%%%%%%%  LAYER 4  %%%%%%%%
-    % numNodes = size(Y_conv.V,1);
-    % Y_nodes = cell(numNodes,1);
-
-    % for nodeIdx = 1:numNodes
-    %     Y_node = Y_conv.slice(1, nodeIdx);  
-    %     Y_final_node = Y_node.affineMap(w1, w2);  
-    %     Y_nodes{nodeIdx} = Y_final_node;
-    % end
-    % Y = Y_nodes;
-
-
+    Y = ImageStar(newV, X3b_.C, X3b_.d, X3b_.pred_lb, X3b_.pred_ub);
 end
 
 function sym = labelSymbol(labelNumbers)
