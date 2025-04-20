@@ -1,3 +1,7 @@
+# Use these seeds and epsilons for results
+seeds = [0, 1, 2];
+epsilons = [.00005, .0005, .005, 0.05];
+
 # Todo List for Results
 - [ ] Drone
   - [ ] 16 no droupout
