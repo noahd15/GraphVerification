@@ -1,5 +1,0 @@
-Summary of robustness results of CORA gnn model with accuracy = 0.4816 
-
-                 Compromised 
-Epsilon | Robust  Unknown  Not Rob.  N 
-  0.005 | 0.000    0.000   1.000   1 
