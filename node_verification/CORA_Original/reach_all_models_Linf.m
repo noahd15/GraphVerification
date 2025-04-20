@@ -37,7 +37,7 @@ fprintf('Feature dimension: %d\n', size(featureDataTest, 2));
 % Study Variables
 % seeds = [0,1,2,3,4]; % models
 seeds = [1]; % models
-epsilon = [0.005]; % attack
+epsilon = [.00005, .0005, .005, .05]; % attack 
 
 % Verify one model at a time - using regular for loop instead of parfor to avoid file access issues
 for k = 1:length(seeds)
@@ -48,3 +48,20 @@ for k = 1:length(seeds)
 
     reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest);
 end
+
+
+% one‑time setup (run in MATLAB interactively)
+mySMTP = 'smtp.gmail.com';            % e.g. Gmail
+myPort = '465';
+myEmail = 'dahle.noah13@gmail.com';
+myPass  = 
+setpref('Internet','SMTP_Server',mySMTP);
+setpref('Internet','E_mail',myEmail);
+setpref('Internet','SMTP_Username',myEmail);
+setpref('Internet','SMTP_Password',myPass);
+props = java.lang.System.getProperties;
+props.setProperty('mail.smtp.auth','true');
+props.setProperty('mail.smtp.socketFactory.class','javax.net.ssl.SSLSocketFactory');
+props.setProperty('mail.smtp.socketFactory.port', myPort);
+
+sendmail('dahle.noah13@gmail.com', 'Remote MATLAB Done', 'Your script has finished running.');
