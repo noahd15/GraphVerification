@@ -11,7 +11,6 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
 
     N = size(featureDataTest, 3);
     % L_inf size
-    epsilon = [0.005; 0.01; 0.02; 0.05];
     targets = {};
     outputSets = {};
     rT = {};
@@ -128,7 +127,7 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     X2b = L.reach(X2, reachMethod); % 18 x 32 x 1 x 289
     repV = repmat(Xverify.V,[1,2,1,1]); %18 x 32 x 1 x 289
     Xrep = ImageStar(repV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
-    % X2b_ = X2b.MinkowskiSum(Xrep);
+    X2b_ = X2b.MinkowskiSum(Xrep);
     % size(X2b_.V)
 
     %%%%%%%%  LAYER 2  %%%%%%%%
@@ -141,7 +140,7 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     X3 = ImageStar(newV, X2b.C, X2b.d, X2b.pred_lb, X2b.pred_ub);
     % part 2
     X3b = L.reach(X3, reachMethod);
-    % X3b_ = X3b.MinkowskiSum(X2b_);
+    X3b_ = X3b.MinkowskiSum(X2b_);
 
     %%%%%%%%  LAYER 3  %%%%%%%%
 
