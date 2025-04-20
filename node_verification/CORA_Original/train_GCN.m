@@ -13,7 +13,7 @@ features = raw.features;
 adjacency = raw.edge_indices;
 labels = raw.labels;
 
-num_features = 64;
+num_features = 16;
 
 % Get number of nodes
 numNodes = size(features, 1);
@@ -32,7 +32,6 @@ X_full = double(data.features);          % 2708×16
 y_full = double(data.labels(:)) + 1;     % 2708×1
 
 featureDim = size(X_full, 2);  
-
 
 % Create label categories using same split
 classes       = unique(y_full);
@@ -63,9 +62,8 @@ if canUseGPU
     T_val_full = gpuArray(T_val_full);
 end
 
-
 %% Network Initialization
-seeds = [1];
+seeds = [0, 1, 2];
 for i = 1:numel(seeds)
     seed = seeds(i);
     rng(seeds(i));
@@ -75,7 +73,8 @@ for i = 1:numel(seeds)
     fprintf('FeatureDim = %d\n', featureDim);
 
     % Layer weights
-    parameters.mult1.Weights = dlarray(initializeGlorot([featureDim,   numHiddenFeatureMaps], numHiddenFeatureMaps, featureDim,   "double"));
+    parameters.mult1.Weights = dlarray(initializeGlorot([featureDim, numHiddenFeatureMaps], numHiddenFeatureMaps, featureDim,   "double"));
+    disp(size(parameters.mult1.Weights))
     parameters.mult2.Weights = dlarray(initializeGlorot([numHiddenFeatureMaps, numHiddenFeatureMaps], numHiddenFeatureMaps, numHiddenFeatureMaps, "double"));
     parameters.mult3.Weights = dlarray(initializeGlorot([numHiddenFeatureMaps, numClasses],         numClasses,        numHiddenFeatureMaps, "double"));
 
@@ -187,7 +186,7 @@ for i = 1:numel(seeds)
     % testAcc, testPrec, testRec, testF1 );
     
    % Save the model and training logs
-    save("models/cora_node_gcn_" + string(seed) + ".mat", ...
+    save("models/cora_node_gcn_" + string(seed) + "_" + string(num_features) + ".mat", ...
      "testAcc", "parameters", ...
      "testPrec", "testRec", "testF1", ...           
      "train_losses", "val_losses", ...
