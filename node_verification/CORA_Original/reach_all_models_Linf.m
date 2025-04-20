@@ -1,4 +1,4 @@
-projectRoot = getenv('AV_PROJECT_HOME');
+    projectRoot = getenv('AV_PROJECT_HOME');
 nnvRoot = getenv('NNV_ROOT');
 
 nnvRoot = fullfile(nnvRoot);
