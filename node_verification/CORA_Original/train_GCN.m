@@ -7,47 +7,62 @@ if isempty(projectRoot)
     error('Set AV_PROJECT_HOME to your project root.');
 end
 
-data = load(fullfile(projectRoot, 'data', 'cora_node.mat'));
-num_features = 32
+% Load original data
+raw = load(fullfile(projectRoot, 'data', 'cora_node.mat'));
+features = raw.features;
+adjacency = raw.edge_indices;
+labels = raw.labels;
 
-PCA(data.edge_indices, data.features, data.labels, num_features, 'reduced_dataset.mat');
+num_features = 64;
+
+% Get number of nodes
+numNodes = size(features, 1);
+
+% Ensure consistent split
+rng(2024);
+[idxTrain, idxValidation, idxTest] = trainingPartitions(numNodes, [0.6 0.3 0.1]);
+
+PCA(adjacency, features, labels, idxTrain, idxValidation, idxTest, num_features, 'reduced_dataset.mat', 1e-4);
+
+% Load reduced dataset
+% Load reduced dataset
 data = load('reduced_dataset.mat');
-
 A_full = data.edge_indices(:,:,1);       % 2708×2708
-X_full = double(data.features(:,:,1));   % 2708×64   
+X_full = double(data.features);          % 2708×16  
 y_full = double(data.labels(:)) + 1;     % 2708×1
 
-[numNodes, featureDim] = size(X_full);
+featureDim = size(X_full, 2);  
 
-rng(2024);
-[idxTrain, idxValidation, idxTest] = trainingPartitions(numNodes, [0.8 0.1 0.1]);
 
+% Create label categories using same split
 classes       = unique(y_full);
 numClasses    = numel(classes);
 classNames    = string(1:numClasses);
+
 y_train_cat   = categorical(y_full(idxTrain), classes, classNames);
 y_val_cat     = categorical(y_full(idxValidation), classes, classNames);
 y_test_cat    = categorical(y_full(idxTest), classes, classNames);
 
-dropoutRate = 0.1;  % typical value
-
-counts       = countcats(y_train_cat);
+% Compute class weights for imbalanced loss
+dropoutRate = 0.3;
+counts = countcats(y_train_cat);
 classWeights = (1 ./ counts) ./ sum(1./counts) * numel(classes);
 
-% Prepare full‑batch data once
+% Prepare training and validation data
 X_train_full = dlarray(X_full(idxTrain, :));
 A_train_full = A_full(idxTrain, idxTrain);
 T_train_full = onehotencode(y_train_cat, 2, 'ClassNames', string(classes));
 
-% Prepare validation‑set data
-X_val_full = dlarray( X_full(idxValidation, :) );
+X_val_full = dlarray(X_full(idxValidation, :));
 A_val_full = A_full(idxValidation, idxValidation);
-T_val_full = onehotencode( y_val_cat, 2, 'ClassNames', string(classes) );
+T_val_full = onehotencode(y_val_cat, 2, 'ClassNames', string(classes));
+
 if canUseGPU
     X_val_full = gpuArray(X_val_full);
-    A_val_full = gpuArray(A_val_full);   
+    A_val_full = gpuArray(A_val_full);
     T_val_full = gpuArray(T_val_full);
 end
+
 
 %% Network Initialization
 seeds = [1];
@@ -69,8 +84,8 @@ for i = 1:numel(seeds)
     end
 
     %% Training Setup
-    numEpochs = 30;
-    learnRate = 0.001;
+    numEpochs = 200;
+    learnRate = 0.01;
     trailingAvg   = [];
     trailingAvgSq = [];
     

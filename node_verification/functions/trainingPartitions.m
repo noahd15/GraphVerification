@@ -40,8 +40,9 @@ end
 function mustSumToOne(v)
 % Validate that value sums to one.
 
-if sum(v,"all") ~= 1
-    error("Value must sum to one.")
+if abs(sum(v,"all") - 1) > 1e-8
+    error("Value must sum to one within numerical tolerance.")
 end
+
 
 end
