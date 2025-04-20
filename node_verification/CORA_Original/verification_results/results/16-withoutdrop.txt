@@ -1,0 +1,6 @@
+Summary of robustness results of gnn model with accuracy = 0.6618 
+
+               CORA
+Epsilon | Robust    Unknown   Not Rob.   Count 
+  0.0005 | 0.544    0.000    0.449    272 
+  0.001 | 0.537    0.000    0.438    272 
