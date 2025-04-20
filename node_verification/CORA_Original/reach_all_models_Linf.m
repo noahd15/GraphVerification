@@ -36,18 +36,21 @@ fprintf('Feature dimension: %d\n', size(featureDataTest, 2));
 
 % Study Variables
 % seeds = [0,1,2,3,4]; % models
-seeds = [0]; %[0, 1, 2, 3]; % models
+seeds = [0, 1, 2]; % models
 num_features = 16;
-epsilon = [0.0005] %[.00005, .0005, .005, 0.05]; 
+epsilons = [.00005, .0005, .005, 0.05]; 
 
 % Verify one model at a time - using regular for loop instead of parfor to avoid file access issues
-for k = 1:length(seeds)
-    % Construct the model path
-    modelPath = "cora_node_gcn_" + string(seeds(k) + "_" + string(num_features));
+parfor e = 1:length(epsilons)
+    for k = 1:length(seeds)
+        % Construct the model path
+        modelPath = "cora_node_gcn_" + string(seeds(k) + "_" + string(num_features));
+    
+        fprintf('Verifying model %s with epsilon %.5f\n', modelPath, epsilons(e));
+    
+        reach_model_Linf(modelPath, epsilons(e), adjacencyDataTest, featureDataTest, labelDataTest, num_features);
 
-    fprintf('Verifying model %s with epsilon %.4f\n', modelPath, epsilon);
-
-    reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest, num_features);
+    end
 end
 
 
