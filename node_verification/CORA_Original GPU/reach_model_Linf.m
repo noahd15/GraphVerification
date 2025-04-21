@@ -33,6 +33,11 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
 
             % Reachability
             t = tic;
+            w1 = gpuArray(w1);
+            w2 = gpuArray(w2);
+            w3 = gpuArray(w3);
+            Averify = gpuArray(Averify);
+            Xverify = gpuArray(Xverify);
             Y_all = computeReachability({w1, w2, w3}, L, reachMethod, Xverify, Averify);
             elapsedTime = toc(t);
 
@@ -111,7 +116,6 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     newV = tensorprod(newV, extractdata(weights{1}), 2, 1);
     newV = reshape(newV, [size(newV,1), size(newV,2), 1, size(newV,3)]); 
     newV = permute(newV, [1 4 3 2]); 
-    
     X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub); 
     % part 2 %
     X2b = L.reach(X2, reachMethod);
