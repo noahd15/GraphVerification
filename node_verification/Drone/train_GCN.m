@@ -1,6 +1,8 @@
 %% Data Loading and Partitioning
 canUseGPU = false;
 
+addpath(genpath('functions'));
+
 projectRoot = getenv('AV_PROJECT_HOME');
 if isempty(projectRoot)
     error('AV_PROJECT_HOME environment variable is not set. Please set it to your project root directory.');
@@ -41,7 +43,7 @@ classWeights = classWeights / sum(classWeights) * numel(classList);
 classWeights = classWeights(:)';
 
 %% Network Initialization
-seeds = [1];
+seeds = [0,1,2];
 for i = 1:length(seeds)
     seed = seeds(i);
     rng(seed);
@@ -168,13 +170,13 @@ for i = 1:length(seeds)
         end
     end
 
-    figure('Position', [100, 100, 800, 600]);
-    cm = confusionchart(labelsTest, YTestClass, 'ColumnSummary', 'column-normalized', 'RowSummary', 'row-normalized');
-    title("GCN Confusion Matrix");
-    xlabel('Predicted Class');
-    ylabel('True Class');
-    annotation('textbox', [0.15, 0.01, 0.7, 0.05], 'String', 'Column normalized: Each cell shows what percentage of predictions for a class were correct', 'EdgeColor', 'none', 'HorizontalAlignment', 'center');
-    annotation('textbox', [0.15, 0.95, 0.7, 0.05], 'String', 'Row normalized: Each cell shows what percentage of actual instances of a class were correctly predicted', 'EdgeColor', 'none', 'HorizontalAlignment', 'center');
+    % figure('Position', [100, 100, 800, 600]);
+    % cm = confusionchart(labelsTest, YTestClass, 'ColumnSummary', 'column-normalized', 'RowSummary', 'row-normalized');
+    % title("GCN Confusion Matrix");
+    % xlabel('Predicted Class');
+    % ylabel('True Class');
+    % annotation('textbox', [0.15, 0.01, 0.7, 0.05], 'String', 'Column normalized: Each cell shows what percentage of predictions for a class were correct', 'EdgeColor', 'none', 'HorizontalAlignment', 'center');
+    % annotation('textbox', [0.15, 0.95, 0.7, 0.05], 'String', 'Row normalized: Each cell shows what percentage of actual instances of a class were correctly predicted', 'EdgeColor', 'none', 'HorizontalAlignment', 'center');
 
     projectRoot = getenv('AV_PROJECT_HOME');
     if isempty(projectRoot)
@@ -188,8 +190,8 @@ for i = 1:length(seeds)
     if ~exist(logsDir, 'dir')
         mkdir(logsDir);
     end
-    saveas(gcf, fullfile(resultsDir, 'batched_confusion_matrix.png'));
-    saveas(gcf, fullfile(logsDir, 'batched_confusion_matrix.png'));
+    % saveas(gcf, fullfile(resultsDir, 'batched_confusion_matrix.png'));
+    % saveas(gcf, fullfile(logsDir, 'batched_confusion_matrix.png'));
 
     plotTrainingMetrics(train_losses, val_losses, [], train_accs, val_accs, [], train_precision, train_recall, train_f1, val_precision, val_recall, val_f1, [], [], [], validationFrequency);
 

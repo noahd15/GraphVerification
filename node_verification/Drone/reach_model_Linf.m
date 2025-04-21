@@ -21,9 +21,9 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
 
             [ATest,XTest,labelsTest] = preprocessData(adjacencyDataTest(:,:,i),featureDataTest(:,:,i),labelDataTest(i,:));
 
-            whos ATest
-            whos XTest
-            whos labelsTest
+            % whos ATest
+            % whos XTest
+            % whos labelsTest
             XTest = dlarray(XTest);
             Averify = normalizeAdjacency(ATest);
 
@@ -87,7 +87,7 @@ function [adjacency, features] = preprocessPredictors(adjacencyData, featureData
         features = [features; X];
 
         if mod(i, 500) == 0
-            fprintf('Processing graph %d\n', i);
+            fprintf('Processing graph %d\n', i); 
         end
     end
 end

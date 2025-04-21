@@ -1,60 +1,66 @@
-%% Create visualizations for computed L_inf results
-
-% We are interested in:
-% 1) How many complete molecules are completely robustly verified (all atoms in a moolecule)?
-% 2) How many atoms are robustly verified?
-
-%% Process results for each model independently
-
-% seeds = [0,1,2,3,4]; % models
-seeds = [1]; % models
-epsilon = [0.005] %; 0.01; 0.02; 0.05];
+seeds = [0, 1, 2];                          % Model seeds
+epsilon = [.00005, .0005, 0.005, .05];           % Epsilon values
+num_features = 16;
 eN = length(epsilon);
+numSeeds = length(seeds);
 
-% Verify one model at a time
-for m=1:length(seeds)
+% Preallocate 3D matrix: [#epsilons x 4 metrics x #seeds]
+allAtoms = zeros(eN, 4, numSeeds);
+testAccs = zeros(numSeeds, 1);
 
-    % get model
-    modelPath = "drone_node_gcn_pca_"+string(seeds(m));
-    
-    % initialize vars
-    samples = zeros(eN,4);
+% Open combined output file
+combinedTxtFile = "verification_results/summary_all_Linf.txt";
+fileID = fopen(combinedTxtFile, 'w');
+fprintf(fileID, ...
+    'Summary of robustness across all GNN models with dropout with %d features\n\n', num_features);
+% Add an “Acc” column
+fprintf(fileID, '%-6s %-10s %-10s %-10s %-10s %-10s %-6s\n', ...
+    'Seed', 'Epsilon', 'Robust', 'Unknown', 'NotRob', 'Total', 'Acc');
+
+for m = 1:numSeeds
+    seed = seeds(m);
+    modelPath = "drone_node_gcn_pca_" + string(seed);
+
+    % Load model test accuracy once per seed
+    mdl = load("models/" + modelPath + ".mat");
+    testAcc = mdl.testAcc;
+    testAccs(m) = testAcc;
+
+    atoms = zeros(eN, 4);
 
     for k = 1:eN
-        % Load data one at a time
-        load("verification_results/mat_files/verified_nodes_"+modelPath+"_eps_"+string(epsilon(k))+".mat"); 
+        % Load verification results
+        matFile = "verification_results/mat_files/verified_nodes_" + modelPath + ...
+                  "_eps_" + string(epsilon(k))  + ".mat";
+        load(matFile, 'results', 'targets');
 
-        N = length(targets);
-        disp(N)
-        for i=1:N
-            % get result data
+        N = numel(targets);
+        for i = 1:N
             res = results{i};
-            rb  = sum(res==1); % robust
-            unk = sum(res==2); % unknown
-            nrb = sum(res==0); % not robust
-
-            % atoms
-            samples(k,1) = samples(k,1) + rb;
-            samples(k,2) = samples(k,2) + unk;
-            samples(k,3) = samples(k,3) + nrb;
-            samples(k,4) = samples(k,4) + length(res);
+            atoms(k,1) = atoms(k,1) + sum(res == 1);  % robust
+            atoms(k,2) = atoms(k,2) + sum(res == 2);  % unknown
+            atoms(k,3) = atoms(k,3) + sum(res == 0);  % not robust
+            atoms(k,4) = atoms(k,4) + numel(res);     % total
         end
+
+        % Print a row with accuracy at the end
+        fprintf(fileID, '%-6d %8.5f   %.3f     %.3f     %.3f     %4d   %.3f\n', ...
+            seed, epsilon(k), ...
+            atoms(k,1)/atoms(k,4), ...
+            atoms(k,2)/atoms(k,4), ...
+            atoms(k,3)/atoms(k,4), ...
+            atoms(k,4), ...
+            testAcc);
     end
 
-    % Save summary
-    save("verification_results/mat_files/summary_results_"+modelPath+".mat", "samples");
-
-    model = load("models/"+modelPath+".mat");
-    
-    % Create table with these values
-    fileID = fopen("verification_results/summary_results_"+modelPath+".txt",'w');
-    fprintf(fileID, 'Summary of robustness results of Drone gnn model with accuracy = %.4f \n\n', model.testAcc);
-    fprintf(fileID,'                 Compromised \n');
-    fprintf(fileID, 'Epsilon | Robust  Unknown  Not Rob.  N \n');
-    fprintf(fileID, '  0.005 | %.3f    %.3f   %.3f   %d \n', samples(1,1)/samples(1,4), samples(1,2)/samples(1,4), samples(1,3)/samples(1,4), samples(1,4));
-    % fprintf(fileID, '   0.01 | %.3f    %.3f   %.3f   %d \n', samples(2,1)/samples(2,4), samples(2,2)/samples(2,4), samples(2,3)/samples(2,4), samples(2,4));
-    % fprintf(fileID, '   0.02 | %.3f    %.3f   %.3f   %d \n', samples(3,1)/samples(3,4), samples(3,2)/samples(3,4), samples(3,3)/samples(3,4), samples(3,4));
-    % fprintf(fileID, '   0.05 | %.3f    %.3f   %.3f   %d \n', samples(4,1)/samples(4,4), samples(4,2)/samples(4,4), samples(4,3)/samples(4,4), samples(4,4));
-    fclose(fileID);
-
+    allAtoms(:,:,m) = atoms;
 end
+
+fclose(fileID);
+
+% Save summary
+save("verification_results/mat_files/summary_all_Linf_dropout_16.mat", ...
+     'allAtoms', 'epsilon', 'seeds', 'num_features', 'testAccs');
+
+fprintf("Summary written to:\n- %s\n- %s\n", ...
+    combinedTxtFile, "verification_results/mat_files/summary_all_Linf_dropout_"+num_features+".mat");

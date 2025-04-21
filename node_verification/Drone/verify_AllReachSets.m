@@ -1,13 +1,14 @@
 %% Verify the robustness reach sets of all models
 % Adjust epsilon and seeds as needed
-epsilon = [0.005] %; 0.01; 0.02; 0.05];
-seeds = [1];
+epsilon = [0.00005, .0005, .005, .05] %; 0.01; 0.02; 0.05];
+seeds = [0,1,2];
 
 parfor m = 1:length(seeds)
 
     modelPath = "drone_node_gcn_pca_" + string(seeds(m));
     
     for k = 1:length(epsilon)
+        fprintf('Verifying model %s with epsilon %.5f\n', modelPath, epsilon(k));
         % Load outputs (must match how you saved them)
         rdata = load("verification_results/mat_files/verified_nodes_" + modelPath + "_eps_" + string(epsilon(k)) + ".mat");
 
@@ -21,6 +22,7 @@ parfor m = 1:length(seeds)
         
         % Save results
         parsave(modelPath, epsilon(k), results, rdata.outputSets, rdata.rT, rdata.targets);
+        disp("DONE")
     end
 
 end

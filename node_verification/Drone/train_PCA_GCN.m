@@ -51,7 +51,7 @@ classWeights = classWeights / sum(classWeights) * numel(classList);
 classWeights = classWeights(:)';
 
 %% Network Initialization
-seeds = [1];
+seeds = [0,1,2];
 for i = 1:length(seeds)
     seed = seeds(i);
     rng(seed);

@@ -25,16 +25,15 @@ fprintf('Feature dimension: %d\n', size(featureDataTest, 2));
 
 % Study Variables
 % seeds = [0,1,2,3,4]; % models
-seeds = [1]; % models
-epsilon = [0.005]; % attack
+seeds = [0,1,2]; % models
+epsilon = [0.00005, .0005, .005, .05]; % attack
 
 % Verify one model at a time - using regular for loop instead of parfor to avoid file access issues
 for k = 1:length(seeds)
     % Construct the model path
     modelPath = "drone_node_gcn_pca_" + string(seeds(k));
 
-    fprintf('Verifying model %s with epsilon %.4f\n', modelPath, epsilon);
+    fprintf('Verifying model %s with epsilon %.5f\n', modelPath, epsilon);
 
     reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest);
 end
-
