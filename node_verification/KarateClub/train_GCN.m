@@ -23,7 +23,7 @@ numNodes = size(features, 1);
 
 % Ensure consistent split
 rng(2024);
-[idxTrain, idxValidation, idxTest] = trainingPartitions(numNodes, [0.6 0.3 0.1]);
+[idxTrain, idxValidation, idxTest] = trainingPartitions(numNodes, [0.4 0.35 0.25]);
 
 % PCA(adjacency, features, labels, idxTrain, idxValidation, idxTest, num_features, 'reduced_dataset.mat', 1e-4);
 
@@ -44,9 +44,33 @@ y_val_cat     = categorical(y_full(idxValidation), classes, classNames);
 y_test_cat    = categorical(y_full(idxTest), classes, classNames);
 
 % Compute class weights for imbalanced loss
-dropoutRate = 0.15; % Lower dropout for better learning
+dropoutRate = 0.1; % Lower dropout for better learning
 counts = countcats(y_train_cat);
 classWeights = (1 ./ counts) ./ sum(1./counts) * numel(classes);
+
+% Class distribution statistics
+trainCounts = countcats(y_train_cat);
+valCounts   = countcats(y_val_cat);
+testCounts  = countcats(y_test_cat);
+
+trainPercent = 100 * trainCounts / sum(trainCounts);
+valPercent   = 100 * valCounts   / sum(valCounts);
+testPercent  = 100 * testCounts  / sum(testCounts);
+
+fprintf("\nClass distribution (Training):\n");
+for i = 1:numel(classes)
+    fprintf("  Class %s: %.2f%%\n", classNames(i), trainPercent(i));
+end
+
+fprintf("\nClass distribution (Validation):\n");
+for i = 1:numel(classes)
+    fprintf("  Class %s: %.2f%%\n", classNames(i), valPercent(i));
+end
+
+fprintf("\nClass distribution (Test):\n");
+for i = 1:numel(classes)
+    fprintf("  Class %s: %.2f%%\n", classNames(i), testPercent(i));
+end
 
 % Prepare training and validation data
 X_train_full = dlarray(X_full(idxTrain, :));
@@ -69,7 +93,8 @@ for i = 1:numel(seeds)
     seed = seeds(i);
     rng(seeds(i));
     parameters = struct;
-    numHiddenFeatureMaps = 68; % Increase hidden units
+    numHiddenFeatureMaps = num_features * 1; % Increase hidden units
+    disp(numHiddenFeatureMaps)
     validationFrequency = 1;
     fprintf('FeatureDim = %d\n', featureDim);
 
@@ -177,14 +202,23 @@ for i = 1:numel(seeds)
     % Scalar test‐set loss
     test_loss = double(crossentropy(Y_test, T_test_full, DataFormat="BC"));
 
-    % plotTrainingMetrics( ...
-    % train_losses, val_losses, ...
-    % train_accs,   val_accs, ...
-    % train_prec, train_rec, train_f1, ...
-    % val_prec,   val_rec,   val_f1, ...
-    % validationFrequency, seed, ...
-    % y_test_cat(:),    Y_test_cls(:), ...
-    % testAcc, testPrec, testRec, testF1 );
+    plotTrainingMetrics( ...
+    train_losses, val_losses, ...
+    train_accs,   val_accs, ...
+    train_prec, train_rec, train_f1, ...
+    val_prec,   val_rec,   val_f1, ...
+    validationFrequency, seed, ...
+    y_test_cat(:),    Y_test_cls(:), ...
+    testAcc, testPrec, testRec, testF1 );
+    
+    figure;
+    plot(1:numEpochs, train_losses, '-o', 'DisplayName', 'Train Loss');
+    hold on;
+    plot(1:numEpochs, val_losses, '-o', 'DisplayName', 'Validation Loss');
+    xlabel('Epoch');
+    ylabel('Loss');
+    legend;
+    title('Training and Validation Loss');
     
    % Save the model and training logs
     save("models/karate_node_gcn_" + string(seed) + "_" + string(num_features) + ".mat", ...
@@ -216,6 +250,7 @@ function Y = model(parameters, X, A, dropoutRate, isTraining)
     end
     conv3 = ANorm * relu2 * parameters.mult3.Weights;
     Y = softmax(conv3, DataFormat="BC");
+    % whos Y
 end
 
 
