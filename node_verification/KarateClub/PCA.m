@@ -1,0 +1,69 @@
+% PCA on karate_node.mat dataset with optional feature selection by variance.
+%
+% Loads: adjacency, features, labels, trainIdx, valIdx, testIdx from karate_node.mat
+
+% ----- Load Data -----
+data = load('karate_node.mat');
+adjacency = data.adjacency;
+features = data.features;
+labels = data.labels;
+trainIdx = data.trainIdx;
+valIdx = data.valIdx;
+testIdx = data.testIdx;
+
+% ----- Parameters -----
+numComponents = 16;      % or set as needed
+outFile = 'reduced_dataset.mat';
+varThreshold = 0;        % set >0 to filter low-variance features
+
+% Reshape features if needed
+if ndims(features) == 3
+    X = reshape(features, size(features,1), size(features,2));
+else
+    X = features;
+end
+
+N = size(X,1);
+X_train = X(trainIdx, :);
+X_val   = X(valIdx, :);
+X_test  = X(testIdx, :);
+
+% ----- Feature Selection -----
+if varThreshold > 0
+    featureVars = var(X_train, 0, 1);  % variance per feature
+    keepIdx = featureVars > varThreshold;
+    X_train = X_train(:, keepIdx);
+    X_val   = X_val(:, keepIdx);
+    X_test  = X_test(:, keepIdx);
+else
+    keepIdx = true(1, size(X_train, 2));  % keep all
+end
+
+% ----- PCA -----
+X_mean = mean(X_train, 1);
+X_train_centered = X_train - X_mean;
+[coeff, score_train, ~, ~, explained] = pca(X_train_centered);
+
+P = coeff(:, 1:numComponents);
+
+X_val_centered  = X_val - X_mean;
+X_test_centered = X_test - X_mean;
+
+X_train_reduced = score_train(:, 1:numComponents);
+X_val_reduced   = X_val_centered * P;
+X_test_reduced  = X_test_centered * P;
+
+% ----- Combine -----
+features = zeros(N, numComponents);
+features(trainIdx, :) = X_train_reduced;
+features(valIdx, :)   = X_val_reduced;
+features(testIdx, :)  = X_test_reduced;
+
+% Save
+edge_indices = adjacency;
+save(outFile, 'edge_indices', 'features', 'labels');
+
+disp(['Saved PCA-reduced dataset to ', outFile]);
+disp(['Explained variance by first ', num2str(numComponents), ' components:']);
+disp(sum(explained(1:numComponents)));
+disp(['Number of features retained after variance filtering: ', num2str(sum(keepIdx))]);
