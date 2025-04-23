@@ -41,14 +41,19 @@ labelDataTrain = labelData(idxTrain, :);
 [AValidation, XValidation, labelsValidation ] = preprocessData(adjacencyData(:, :, idxValidation), featureData(:, :, idxValidation), labelData(idxValidation, :), 'preprocessedPredictors_val_PCA.mat');
 [ATest, XTest, labelsTest] = preprocessData(adjacencyData(:, :, idxTest), featureData(:, :, idxTest), labelData(idxTest, :), 'preprocessedPredictors_test_PCA.mat');
 
-classes = categories(labelsTrain_full);   % Classes as categorical strings
-numClasses = numel(classes);
+
+
 
 classList = categories(labelsTrain_full);
 counts = countcats(labelsTrain_full);
 classWeights = 1 ./ counts;
 classWeights = classWeights / sum(classWeights) * numel(classList);
 classWeights = classWeights(:)';
+
+
+for i = 1:length(classes)
+    fprintf('  %s: %d\n', classes{i}, counts(i));
+end
 
 %% Network Initialization
 seeds = [0,1,2];

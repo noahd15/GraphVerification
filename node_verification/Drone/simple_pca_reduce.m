@@ -28,7 +28,8 @@ num_classes = max(labelData);
 
 
 adjacencyData = edges2Adjacency(data);
-numObservations = size(adjacencyData, num_classes);
+[numNodes, numFeatures, numGraphs] = size(featureData);
+numObservations = numGraphs;
 
 %% Split data into train/validation/test sets
 rng(2024);  % For reproducibility
@@ -37,7 +38,6 @@ rng(2024);  % For reproducibility
 [idxTrain, idxValidation, idxTest] = trainingPartitions(numObservations, [0.8 0.1 0.1]);
 %% --- Perform PCA on the Training Data ---
 % Get dimensions
-[numNodes, numFeatures, numGraphs] = size(featureData);
 desired_dim = 16;  % Target dimensionality after PCA
 
 % Create a new feature array with reduced dimensions

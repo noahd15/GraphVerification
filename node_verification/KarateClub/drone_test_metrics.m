@@ -38,6 +38,7 @@ bar(groupedData);
 set(gca, 'XTickLabel', metricLabels, 'FontSize', 12);
 % legend({'16 Features', '32 Features'}, 'Location', 'northwest');
 ylabel('Score');
+ylim([0 1]);
 title('Drone GCN Test Metrics Comparison (Average over Seeds)', 'FontSize', 14);
 grid on;
 

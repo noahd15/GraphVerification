@@ -1,5 +1,5 @@
-seeds = [0, 1, 2];                          % Model seeds
-epsilon = [.00005, .0005, 0.005, .05];           % Epsilon values
+seeds = [0,1,2];                          % Model seeds
+epsilon = [.00005, .0005, 0.005];           % Epsilon values
 num_features = 16;
 eN = length(epsilon);
 numSeeds = length(seeds);
@@ -57,6 +57,12 @@ for m = 1:numSeeds
 end
 
 fclose(fileID);
+
+% Ensure output directory exists
+outDir = "verification_results/mat_files";
+if ~exist(outDir, 'dir')
+    mkdir(outDir);
+end
 
 % Save summary
 save("verification_results/mat_files/summary_all_Linf_dropout_16.mat", ...

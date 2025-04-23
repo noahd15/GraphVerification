@@ -26,7 +26,7 @@ fprintf('Feature dimension: %d\n', size(featureDataTest, 2));
 % Study Variables
 % seeds = [0,1,2,3,4]; % models
 seeds = [0,1,2]; % models
-epsilon = [0.00005, .0005, .005, .05]; % attack
+epsilon = [0.00005, .0005, .005]; % attack
 
 % Verify one model at a time - using regular for loop instead of parfor to avoid file access issues
 for k = 1:length(seeds)
