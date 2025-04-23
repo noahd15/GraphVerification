@@ -1,5 +1,7 @@
 function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest, labelDataTest, num_features)
     % Setup
+
+    % fprintf('adjacencyDataTest size: %d x %d\n', size(adjacencyDataTest));
     adjacencyDataTest = reshape(adjacencyDataTest, [size(adjacencyDataTest, 1), size(adjacencyDataTest, 2), 1]);
     featureDataTest   = reshape(featureDataTest, [size(featureDataTest, 1), size(featureDataTest, 2), 1]);
     adjacencyDataTest = double(adjacencyDataTest);
@@ -8,8 +10,9 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
     load("models/"+modelPath+".mat");
 
     w1 = gather(parameters.mult1.Weights);
-    w2 = gather(parameters.mult2.Weights);
-    w3 = gather(parameters.mult3.Weights);
+
+    % w2 = gather(parameters.mult2.Weights);
+    % w3 = gather(parameters.mult3.Weights);
 
     N = size(featureDataTest, 3);
     reachMethod = 'approx-star';
@@ -39,13 +42,13 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
 
             % Reachability
             t = tic;
-            Y_all = computeReachability({w1, w2, w3}, L, reachMethod, Xverify, Averify);
+            Y_all = computeReachability({w1}, L, reachMethod, Xverify, Averify);
             y = Y_all.V;
-            whos y
+            % whos y
             elapsedTime = toc(t);
 
             numNodes = size(Y_all.V, 1);
-            fprintf('Num nodes: %d\n', numNodes);
+            % fprintf('Num nodes: %d\n', numNodes);
 
             for j = 1:numNodes
                 matIdx = zeros(1, numNodes); matIdx(j) = 1;
@@ -70,8 +73,6 @@ end
 
 function [adjacency, features, labels] = preprocessData(adjacencyData, featureData, labelData)
     [adjacency, features] = preprocessPredictors(adjacencyData, featureData);
-    fprintf('Adjacency size: %d x %d\n', size(adjacency));
-    fprintf('Feature size: %d x %d\n', size(features));
     labels = labelData(:);
 end
 
@@ -129,34 +130,35 @@ function Y = computeReachability(weights, L, reachMethod, input, adjMat)
     X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub); 
     % part 2 %
     X2b = L.reach(X2, reachMethod);
-    repV = repmat(Xverify.V,[1,2,1,1]); 
+    repV = repmat(Xverify.V,[1,1,1,1]); 
     Xrep = ImageStar(repV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
-    X2b_ = X2b.MinkowskiSum(Xrep);
+    % X2b_ = X2b.MinkowskiSum(Xrep);
 
-    %%%%%%%%  LAYER 2  %%%%%%%%
+    %%%%%%%% COMMENTED OUT MULTI-LAYER CODE %%%%%%%%
+    % %%%%%%%%  LAYER 2  %%%%%%%%
+    % newV = X2b_.V;
+    % newV = tensorprod(full(Averify), newV, 2, 1);
+    % newV = tensorprod(newV, extractdata(weights{2}),2,1);
+    % newV = permute(newV, [1 4 2 3]);
+    % X3 = ImageStar(newV, X2b_.C, X2b_.d, X2b_.pred_lb, X2b_.pred_ub);
+    % X3b = L.reach(X3, reachMethod);
+    % X3b_ = X3b.MinkowskiSum(X2b_);
 
-    % part 1
-    newV = X2b_.V;
-    newV = tensorprod(full(Averify), newV, 2, 1);
-    newV = tensorprod(newV, extractdata(weights{2}),2,1);
-    newV = permute(newV, [1 4 2 3]);
-    X3 = ImageStar(newV, X2b_.C, X2b_.d, X2b_.pred_lb, X2b_.pred_ub);
-    % part 2
-    X3b = L.reach(X3, reachMethod);
-    X3b_ = X3b.MinkowskiSum(X2b_);
+    % %%%%%%%%  LAYER 3  %%%%%%%%
+    % newV = X3b_.V;
+    % newV = tensorprod(full(Averify), newV, 2, 1);
+    % newV = tensorprod(newV, extractdata(weights{3}), 2, 1);
+    % newV = permute(newV, [1 4 2 3]);
+    % Y = ImageStar(newV, X3b_.C, X3b_.d, X3b_.pred_lb, X3b_.pred_ub);
 
-    %%%%%%%%  LAYER 3  %%%%%%%%
-
-    newV = X3b_.V;
-    newV = tensorprod(full(Averify), newV, 2, 1);
-    newV = tensorprod(newV, extractdata(weights{3}), 2, 1);
-    newV = permute(newV, [1 4 2 3]);
-    Y = ImageStar(newV, X3b_.C, X3b_.d, X3b_.pred_lb, X3b_.pred_ub);
+    %%%%%%%% SINGLE-LAYER OUTPUT %%%%%%%%
+    Y = Xrep;
 end
 
 function result = verifyAtom(X, target)
     % X is a 7D Star set (output scores for one node)
-    atomHs = label2Hs(target);
+    outDim = size(X.V, 2);  % Use the number of columns (i.e. output dimension)
+    atomHs = label2Hs(target, outDim);
 
     res = verify_specification(X, atomHs);
 
@@ -179,27 +181,28 @@ function res = checkViolated(Set, label)
     end
 end
 
-function Hs = label2Hs(label)
-    % Convert output target to halfspace for verification
-    % @Hs: unsafe/not robust region defined as a HalfSpace
+function Hs = label2Hs(label, outDim)
+    % Convert output target to halfspace for verification.
+    % outDim: dimensionality of the network output.
+    if nargin < 2
+        error('Please supply the output dimension as the second argument.');
+    end
 
-    outSize = 4; % num of classes
-    % classes = ["H";"C";"N";"O";"S"];
     target = label;
 
-    % Define HalfSpace Matrix and vector
-    G = ones(outSize,1);
-    G = diag(G);
-    G(target, :) = [];
-    G = -G;
+    % Build the halfspace constraints assuming each output dimension is a score.
+    % Remove the constraint for the target and define the others accordingly.
+    G = eye(outDim);
+    G(target,:) = [];
+    % For each non-target entry, require: output(target) - output(i) >= 0 
+    % which can be written as -1*output(i) + 1*output(target) >= 0;
+    G = -G;  % multiply by -1 to get the correct signs
     G(:, target) = 1;
 
     g = zeros(size(G,1),1);
 
-    % Create HalfSapce to define robustness specification
     Hs = [];
-    for i=1:length(g)
+    for i = 1:length(g)
         Hs = [Hs; HalfSpace(G(i,:), g(i))];
     end
-
 end

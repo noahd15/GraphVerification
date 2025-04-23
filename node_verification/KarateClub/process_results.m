@@ -1,5 +1,5 @@
 seeds = [0, 1, 2];                          % Model seeds
-epsilon = [.00005, .0005, 0.005];           % Epsilon values
+epsilon = [.00005, .0005, 0.005, .05, .5];           % Epsilon values
 num_features = size(X_full, 2);             % Number of features
 eN = length(epsilon);
 numSeeds = length(seeds);
@@ -19,13 +19,13 @@ fprintf(fileID, '%-6s %-10s %-10s %-10s %-10s %-10s %-6s\n', ...
 
 for m = 1:numSeeds
     seed = seeds(m);
-    modelPath = "cora_node_gcn_" + string(seed) + "_" + string(num_features);
+    modelPath = "karate_node_gcn_" + string(seed) + "_" + string(num_features);
 
     % Load model test accuracy once per seed
     mdl = load("models/" + modelPath + ".mat");
     testAcc = mdl.testAcc;
     testAccs(m) = testAcc;
-
+    % modelPath = "cora_node_gcn_" + string(seed) + "_" + string(num_features);
     atoms = zeros(eN, 4);
 
     for k = 1:eN

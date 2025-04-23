@@ -18,7 +18,7 @@ figure;
 semilogx(dropout.epsilon, avgRobust_dropout, '-s', 'LineWidth', 2, 'MarkerSize', 8);
 xlabel('\epsilon', 'FontSize', 12);
 ylabel('Average Robustness', 'FontSize', 12);
-title('Average Robustness vs Epsilon (16 Features)', 'FontSize', 13);
+title('Average Robustness vs Epsilon (34 Features)', 'FontSize', 13);
 legend({'With Dropout'}, 'Location', 'southwest');
 grid on;
 ylim([0 1]);

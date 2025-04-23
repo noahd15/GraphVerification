@@ -44,7 +44,7 @@ y_val_cat     = categorical(y_full(idxValidation), classes, classNames);
 y_test_cat    = categorical(y_full(idxTest), classes, classNames);
 
 % Compute class weights for imbalanced loss
-dropoutRate = 0.1; % Lower dropout for better learning
+dropoutRate = 0.3; % Lower dropout for better learning
 counts = countcats(y_train_cat);
 classWeights = (1 ./ counts) ./ sum(1./counts) * numel(classes);
 
@@ -93,23 +93,21 @@ for i = 1:numel(seeds)
     seed = seeds(i);
     rng(seeds(i));
     parameters = struct;
-    numHiddenFeatureMaps = num_features * 1; % Increase hidden units
+    numHiddenFeatureMaps = num_features * 1; % Integer division for hidden units
     disp(numHiddenFeatureMaps)
     validationFrequency = 1;
     fprintf('FeatureDim = %d\n', featureDim);
 
     % Layer weights
-    parameters.mult1.Weights = dlarray(initializeGlorot([featureDim, numHiddenFeatureMaps], numHiddenFeatureMaps, featureDim,   "double"));
-    disp(size(parameters.mult1.Weights))
-    parameters.mult2.Weights = dlarray(initializeGlorot([numHiddenFeatureMaps, numHiddenFeatureMaps], numHiddenFeatureMaps, numHiddenFeatureMaps, "double"));
-    parameters.mult3.Weights = dlarray(initializeGlorot([numHiddenFeatureMaps, numClasses],         numClasses,        numHiddenFeatureMaps, "double"));
+    parameters.mult1.Weights = dlarray(initializeGlorot([featureDim, numHiddenFeatureMaps], numHiddenFeatureMaps, featureDim, "double"));
+    parameters.mult2.Weights = dlarray(initializeGlorot([numHiddenFeatureMaps, numClasses], numClasses, numHiddenFeatureMaps, "double"));
 
     if canUseGPU
         X_train_full = gpuArray(X_train_full);
     end
 
     %% Training Setup
-    numEpochs = 100;
+    numEpochs = 1000;
     learnRate = 0.01; % Lower learning rate for stability
     trailingAvg   = [];
     trailingAvgSq = [];
@@ -152,7 +150,7 @@ for i = 1:numel(seeds)
         if mod(epoch, validationFrequency)==0
             X_val_full = dlarray(X_full(idxValidation, :));
             if canUseGPU, X_val_full = gpuArray(X_val_full); end
-            Y_val = model(parameters, X_val_full, A_val_full, dropoutRate, false); % Use eval mode for validation
+            Y_val = model(parameters, X_val_full, A_val_full, .3, false); % Use eval mode for validation
             Y_val_cls = onehotdecode(Y_val, string(classes), 2);
             val_accs(epoch)   = mean(Y_val_cls == y_val_cat);
             val_losses(epoch) = double(crossentropy(Y_val, T_val_full, DataFormat="BC"));
@@ -161,9 +159,13 @@ for i = 1:numel(seeds)
             val_rec(epoch)    = rv(end);
             val_f1(epoch)     = fv(end);
         end
-
-        fprintf('Epoch %3d/%d — Loss=%.4f | TrainAcc=%.2f%% | ValAcc=%.2f%% | Elapsed=%.1fs\n', ...
-            epoch, numEpochs, train_losses(epoch), train_accs(epoch)*100, val_accs(epoch)*100, toc(t));
+        if mod(epoch, 100)==0 || epoch == numEpochs
+            % Display training progress
+            fprintf('Epoch %3d/%d — Loss=%.4f | TrainAcc=%.2f%% | ValAcc=%.2f%%\n', ...
+                epoch, numEpochs, train_losses(epoch), train_accs(epoch)*100, val_accs(epoch)*100);
+        end
+        % fprintf('Epoch %3d/%d — Loss=%.4f | TrainAcc=%.2f%% | ValAcc=%.2f%% | Elapsed=%.1fs\n', ...
+        %     epoch, numEpochs, train_losses(epoch), train_accs(epoch)*100, val_accs(epoch)*100, toc(t));
     end
 
     %% Final Test
@@ -172,7 +174,7 @@ for i = 1:numel(seeds)
     T_test_full = onehotencode(y_test_cat, 2, 'ClassNames', string(classes));
     if canUseGPU, X_test_full = gpuArray(X_test_full); end
 
-    Y_test = model(parameters, X_test_full, A_test_full, 0.5, false);
+    Y_test = model(parameters, X_test_full, A_test_full, dropoutRate, false);
     Y_test_cls = onehotdecode(Y_test, string(classes), 2);
     testAcc    = mean(Y_test_cls == y_test_cat);
     [pt, rt, ft] = calculatePrecisionRecall(Y_test_cls, y_test_cat);
@@ -202,23 +204,26 @@ for i = 1:numel(seeds)
     % Scalar test‐set loss
     test_loss = double(crossentropy(Y_test, T_test_full, DataFormat="BC"));
 
-    plotTrainingMetrics( ...
-    train_losses, val_losses, ...
-    train_accs,   val_accs, ...
-    train_prec, train_rec, train_f1, ...
-    val_prec,   val_rec,   val_f1, ...
-    validationFrequency, seed, ...
-    y_test_cat(:),    Y_test_cls(:), ...
-    testAcc, testPrec, testRec, testF1 );
-    
-    figure;
-    plot(1:numEpochs, train_losses, '-o', 'DisplayName', 'Train Loss');
-    hold on;
-    plot(1:numEpochs, val_losses, '-o', 'DisplayName', 'Validation Loss');
-    xlabel('Epoch');
-    ylabel('Loss');
-    legend;
-    title('Training and Validation Loss');
+    % plotTrainingMetrics( ...
+    % train_losses, val_losses, ...
+    % train_accs,   val_accs, ...
+    % train_prec, train_rec, train_f1, ...
+    % val_prec,   val_rec,   val_f1, ...
+    % validationFrequency, seed, ...
+    % y_test_cat(:),    Y_test_cls(:), ...
+    % testAcc, testPrec, testRec, testF1 );
+
+    % % set(0, 'DefaultFigureVisible', 'on');
+    % figure;
+    % plot(1:numEpochs, train_losses, '-o', 'DisplayName', 'Train Loss');
+    % hold on;
+    % plot(1:numEpochs, val_losses, '-o', 'DisplayName', 'Validation Loss');
+    % xlabel('Epoch');
+    % ylabel('Loss');
+    % legend;
+    % title('Training and Validation Loss');
+    % saveas(gcf, "figures/karate_node_gcn_" + string(seed) + "_" + string(num_features) + ".png");
+    % % drawnow; % Force MATLAB to render the plot
     
    % Save the model and training logs
     save("models/karate_node_gcn_" + string(seed) + "_" + string(num_features) + ".mat", ...
@@ -239,20 +244,19 @@ end
 function Y = model(parameters, X, A, dropoutRate, isTraining)
     ANorm = normalizeAdjacency(A);
     conv1 = ANorm * X * parameters.mult1.Weights;
-    relu1 = relu(conv1);
-    if isTraining
-        relu1 = dropout(relu1, dropoutRate);
+    % First layer: GCN + ReLU + Dropout (if training)
+    conv1 = ANorm * X * parameters.mult1.Weights;
+    if isTraining && dropoutRate > 0
+        conv1 = dropout(conv1, dropoutRate);
     end
-    conv2 = ANorm * relu1 * parameters.mult2.Weights;
-    relu2 = relu(conv2);
-    if isTraining
-        relu2 = dropout(relu2, dropoutRate);
-    end
-    conv3 = ANorm * relu2 * parameters.mult3.Weights;
-    Y = softmax(conv3, DataFormat="BC");
-    % whos Y
-end
+    conv1 = relu(conv1);
 
+    % Second layer: GCN (output) layer
+    conv2 = ANorm * conv1 * parameters.mult2.Weights;
+    % conv2 = relu(conv2);
+
+    Y = softmax(conv2, DataFormat="BC");
+end
 
 function [loss, gradients] = modelLoss(parameters, X, A, T, classWeights, dropoutRate, isTraining)
     Y = model(parameters, X, A, dropoutRate, isTraining);

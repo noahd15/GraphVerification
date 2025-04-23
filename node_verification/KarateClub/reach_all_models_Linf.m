@@ -27,20 +27,27 @@ rng(2024);
 disp(data);
 
 
-[~, ~, idxTest] = trainingPartitions(numNodes, [0.6 0.3 0.1]);
+[~, ~, idxTest] = trainingPartitions(numNodes, [0.4 0.35 0.25]);
+
+[trainIdx, valIdx, testIdx] = trainingPartitions(numNodes, [0.4 0.35 0.25]);
+
+sets = {'Train', 'Validation', 'Test'};
+indices = {trainIdx, valIdx, testIdx};
+
+for i = 1:length(sets)
+    labels = y_full(indices{i});
+    classes = unique(labels);
+    counts = histc(labels, classes);
+    fprintf('%s set class distribution:\n', sets{i});
+    for j = 1:length(classes)
+        fprintf('  Class %d: %d\n', classes(j), counts(j));
+    end
+end
 
 adjacencyDataTest = A_full(idxTest, idxTest);
 featureDataTest   = X_full(idxTest, :);
 labelDataTest     = y_full(idxTest);
 
-fprintf('adjacencyDataTest size: %d x %d\n', size(adjacencyDataTest));
-fprintf('featureDataTest size: %d x %d\n', size(featureDataTest));
-fprintf('labelDataTest size: %d x %d\n', size(labelDataTest));
-fprintf('Number of nodes in test set: %d\n', length(idxTest));
-
-
-fprintf('Number of test samples: %d\n', length(idxTest));
-fprintf('Feature dimension: %d\n', size(featureDataTest, 2));
 
 %% Verify models
 
@@ -48,7 +55,7 @@ fprintf('Feature dimension: %d\n', size(featureDataTest, 2));
 % seeds = [0,1,2,3,4]; % models
 seeds = [0, 1, 2]; % models
 num_features = size(featureDataTest, 2);
-epsilons = [.00005, .0005, .005]; 
+epsilons = [.00005, .0005, .005, .05]; % epsilons
 
 % Verify one model at a time - using regular for loop instead of parfor to avoid file access issues
 parfor e = 1:length(epsilons)
