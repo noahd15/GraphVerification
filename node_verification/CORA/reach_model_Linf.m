@@ -30,9 +30,12 @@ function reach_model_Linf(modelPath, epsilon, adjacencyDataTest, featureDataTest
             lb = extractdata(XTest - epsilon(k));
             ub = extractdata(XTest + epsilon(k));
             Xverify = ImageStar(lb, ub);
+            % x = Xverify.V;
+            % whos x
 
             % Reachability
             t = tic;
+
             Y_all = computeReachability({w1, w2, w3}, L, reachMethod, Xverify, Averify);
             elapsedTime = toc(t);
 
@@ -98,46 +101,48 @@ function ANorm = normalizeAdjacency(A)
 end
 
 function Y = computeReachability(weights, L, reachMethod, input, adjMat)
-    Xverify = input;
-    Averify = adjMat; 
-    n = size(adjMat,1); 
+    % Generic reachability over each layer
+    numLayers = numel(weights);
+    A_full    = full(adjMat);
+    origV     = input.V;       % for first‐layer Minkowski sum
+    prevStar  = input;
 
-    %%%%%%%%  LAYER 1  %%%%%%%%
-    newV = Xverify.V; %272x16x1x4353
-    newV = squeeze(Xverify.V); %272x16x4353  
-    Averify_full = full(Averify);
-    newV = tensorprod(Averify_full, newV, 2, 1); %272x16x4353 
-    w = extractdata(weights{1}); %32x64 
+    % --- first layer outside the loop ---
+    % 1) Linear map: A · V · W_1
+    newV = squeeze(prevStar.V);      % first layer has singleton 3rd dim
+    newV = tensorprod(A_full, newV, 2, 1);
     newV = tensorprod(newV, extractdata(weights{1}), 2, 1);
-    newV = reshape(newV, [size(newV,1), size(newV,2), 1, size(newV,3)]); 
-    newV = permute(newV, [1 4 3 2]); 
-    
-    X2 = ImageStar(newV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub); 
-    % part 2 %
-    X2b = L.reach(X2, reachMethod);
-    repV = repmat(Xverify.V,[1,2,1,1]); 
-    Xrep = ImageStar(repV, Xverify.C, Xverify.d, Xverify.pred_lb, Xverify.pred_ub);
-    X2b_ = X2b.MinkowskiSum(Xrep);
+    % 2) reshape & permute back to 4‐D
+    newV = reshape(newV, [size(newV,1), size(newV,2), 1, size(newV,3)]);
+    newV = permute(newV, [1 4 3 2]);
+    % 3) construct ImageStar
+    Xcur = ImageStar(newV, prevStar.C, prevStar.d, prevStar.pred_lb, prevStar.pred_ub);
+    % 4) reachability + Minkowski sum with original uncertainty
+    Xr = L.reach(Xcur, reachMethod);
+    repV    = repmat(origV, [1,2,1,1]);
+    Xrep    = ImageStar(repV, input.C, input.d, input.pred_lb, input.pred_ub);
+    prevStar = Xr.MinkowskiSum(Xrep);
 
-    %%%%%%%%  LAYER 2  %%%%%%%%
+    % --- remaining layers in loop ---
+    for i = 2:numLayers
+        % 1) Linear map: A · V · W_i
+        newV = prevStar.V;
+        newV = tensorprod(A_full, newV, 2, 1);
+        newV = tensorprod(newV, extractdata(weights{i}), 2, 1);
+        % 2) permute back to 4‐D
+        newV = permute(newV, [1 4 2 3]);
+        % 3) construct ImageStar
+        Xcur = ImageStar(newV, prevStar.C, prevStar.d, prevStar.pred_lb, prevStar.pred_ub);
+        % 4) reachability + Minkowski sum
+        Xr = L.reach(Xcur, reachMethod);
+        if i < numLayers
+            prevStar = Xr.MinkowskiSum(prevStar);
+        else
+            prevStar = Xr;
+        end
+    end
 
-    % part 1
-    newV = X2b_.V;
-    newV = tensorprod(full(Averify), newV, 2, 1);
-    newV = tensorprod(newV, extractdata(weights{2}),2,1);
-    newV = permute(newV, [1 4 2 3]);
-    X3 = ImageStar(newV, X2b_.C, X2b_.d, X2b_.pred_lb, X2b_.pred_ub);
-    % part 2
-    X3b = L.reach(X3, reachMethod);
-    X3b_ = X3b.MinkowskiSum(X2b_);
-
-    %%%%%%%%  LAYER 3  %%%%%%%%
-
-    newV = X3b_.V;
-    newV = tensorprod(full(Averify), newV, 2, 1);
-    newV = tensorprod(newV, extractdata(weights{3}), 2, 1);
-    newV = permute(newV, [1 4 2 3]);
-    Y = ImageStar(newV, X3b_.C, X3b_.d, X3b_.pred_lb, X3b_.pred_ub);
+    Y = prevStar;
 end
 
 function result = verifyAtom(X, target)

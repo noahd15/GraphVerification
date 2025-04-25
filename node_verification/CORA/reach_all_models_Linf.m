@@ -37,8 +37,8 @@ fprintf('Feature dimension: %d\n', size(featureDataTest, 2));
 % Study Variables
 % seeds = [0,1,2,3,4]; % models
 seeds = [0, 1, 2]; % models
-num_features = 16;
-epsilons = [.00005, .0005, .005]; 
+num_features = 32;
+epsilons = [.00005]; 
 
 % Verify one model at a time - using regular for loop instead of parfor to avoid file access issues
 parfor e = 1:length(epsilons)

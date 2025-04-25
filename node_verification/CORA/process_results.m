@@ -1,6 +1,6 @@
 seeds = [0, 1, 2];                          % Model seeds
-epsilon = [.00005, .0005, 0.005];           % Epsilon values
-num_features = 16;
+epsilon = [.00005];           % Epsilon values
+num_features = 32;
 eN = length(epsilon);
 numSeeds = length(seeds);
 
