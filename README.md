@@ -17,3 +17,4 @@ epsilons = [.00005, .0005, .005];
  
 - [ ] Add Graph classification
    
+- [ ] Make README
